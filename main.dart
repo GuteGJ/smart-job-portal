@@ -2,6 +2,7 @@ import 'dart:io';
 
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
+List<Map<String, String>> jobs = [];
 
 void main(){
 
@@ -182,9 +183,9 @@ void showUserMenu(){
     switch (input){
       case '1':
         if (role == 'candidate'){
-          print('Browsw Jobs - Coming soon!');
+          browseJobs();
         } else {
-          print('Post a Job - Coming soon!');
+          postJob();
         }
         break;
       case'2':
@@ -206,3 +207,73 @@ void showUserMenu(){
   }while (inMenu);
 }
 
+void browseJobs(){
+  print('\n=== AVAILABLE JOBS ===');
+
+  if (jobs.isEmpty){
+    print('No jobs available.');
+    return;
+  }
+
+  for (int i = 0; i < jobs.length; i++) {
+    print('\n${i + 1}. ${jobs[i]['title']}');
+    print('  Company: ${jobs[i]['company']}');
+    print('  Location: ${jobs[i]['location']}');
+    print('  Salary: ${jobs[i]['salary']}');
+    print('  Category: ${jobs[i]['category']}');
+    print('  Posted by: ${jobs[i]['postedBy']}');
+  }
+}
+
+//----------- Post A job (Employer) ----------
+
+void postJob() {
+  print('\n--- Post a New Job ---');
+
+  print('Job Title: ');
+  String? title = stdin.readLineSync();
+  if (title == null || title.isEmpty) {
+    print('Title cannot be empty!');
+    return;
+  }
+
+  print('Company: ');
+  String? company = stdin.readLineSync();
+  if (company == null || company.isEmpty) {
+    print('Company cannot be empty!');
+    return;
+  }
+
+  print('Location: ');
+  String? location = stdin.readLineSync();
+  if (location == null || location.isEmpty) {
+    print('Location cannot be empty!');
+    return;
+  }
+
+  print('Salary: ');
+  String? salary = stdin.readLineSync();
+  if (salary == null || salary.isEmpty) {
+    print('Salary cannot be empty!');
+    return;
+  }
+
+  print('Category: ');
+  String? category = stdin.readLineSync();
+  if (category == null || category.isEmpty) {
+    print('Category cannot be empty!');
+    return;
+  }
+
+  // Add job to the list
+  jobs.add({
+    'title': title,
+    'company': company,
+    'location': location,
+    'salary': salary,
+    'category': category,
+    'postedBy': currentUser!['email']!,
+  });
+
+  print('✅ Job posted successfully!');
+}
