@@ -5,7 +5,18 @@ Map<String, String>? currentUser = null;
 List<Map<String, String>> jobs = [];
 List<Map<String, String>> applications = [];
 
+// Pre-load the admin account
+void setupAdmin() {
+  users['admin@jobportal.com'] = {
+    'password': 'admin123',
+    'name': 'System Admin',
+    'role': 'admin',
+  };
+}
+
 void main(){
+
+  setupAdmin();
 
   bool isRunning = true;
 
@@ -174,6 +185,12 @@ void showUserMenu(){
       print('1. Browse Jobs');
       print('2. My Applications');
       print('3. Logout');
+    }else if (role == 'admin') {
+      print('\n=== ADMIN MENU ===');
+      print('1. Dashboard & Analytics');
+      print('2. View All Users');
+      print('3. View All Jobs');
+      print('4. Logout');
     }else if (role == 'employer'){
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
@@ -188,6 +205,8 @@ void showUserMenu(){
       case '1':
         if (role == 'candidate'){
           browseJobs();
+        } else if (role == 'admin') {
+          adminDashboard();
         } else {
           postJob();
         }
@@ -195,17 +214,34 @@ void showUserMenu(){
       case'2':
       if (role == 'candidate'){
         myApplications();
-      } else {
+      }else if (role == 'admin') {
+        viewAllUsers();
+      }else {
         viewApplicants();
       }
       break;
-    case '3':
-      print('Logged out. Goodbye, ${currentUser!['name']}');
-      currentUser = null;
-      inMenu = false;
-      break;
-    default:
-      print('Invalid choice.');
+          case '3':
+        if (role == 'candidate') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        } else if (role == 'admin') {
+          viewAllJobs();
+        } else {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        }
+        break;
+      case '4':
+        if (role == 'admin') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        }
+        break;
+      default:
+        print('Invalid choice.');
     }
 
   }while (inMenu);
@@ -427,3 +463,121 @@ void postJob() {
 
   print('✅ Job posted successfully!');
 }
+
+// ---------- ADMIN DASHBOARD ----------
+void adminDashboard() {
+  print('\n========== ADMIN DASHBOARD ==========');
+
+  // Total counts
+  int totalUsers = users.length;
+  int totalJobs = jobs.length;
+  int totalApplications = applications.length;
+
+  print('👥 Total Users:        $totalUsers');
+  print('💼 Total Jobs:         $totalJobs');
+  print('📝 Total Applications: $totalApplications');
+
+  // Count by role
+  int candidateCount = 0;
+  int employerCount = 0;
+
+  for (var user in users.values) {
+    if (user['role'] == 'candidate') {
+      candidateCount++;
+    } else if (user['role'] == 'employer') {
+      employerCount++;
+    }
+  }
+
+  print('\n📊 Users by Role:');
+  print('   Candidates: $candidateCount');
+  print('   Employers:  $employerCount');
+  print('   Admins:     1');
+
+  // Most popular job category
+  if (jobs.isNotEmpty) {
+    Map<String, int> categoryCount = {};
+
+    for (var job in jobs) {
+      String category = job['category']!;
+      if (categoryCount.containsKey(category)) {
+        categoryCount[category] = categoryCount[category]! + 1;
+      } else {
+        categoryCount[category] = 1;
+      }
+    }
+
+    // Find the category with the highest count
+    String topCategory = '';
+    int highestCount = 0;
+
+    categoryCount.forEach((category, count) {
+      if (count > highestCount) {
+        highestCount = count;
+        topCategory = category;
+      }
+    });
+
+    print('\n🔥 Most Popular Category: $topCategory ($highestCount jobs)');
+  }
+
+  // Application status summary
+  if (applications.isNotEmpty) {
+    Map<String, int> statusCount = {};
+
+    for (var app in applications) {
+      String status = app['status']!;
+      if (statusCount.containsKey(status)) {
+        statusCount[status] = statusCount[status]! + 1;
+      } else {
+        statusCount[status] = 1;
+      }
+    }
+
+    print('\n📋 Application Status Summary:');
+    statusCount.forEach((status, count) {
+      print('   $status: $count');
+    });
+  }
+
+  print('=====================================');
+}
+
+
+// ---------- VIEW ALL USERS (Admin) ----------
+void viewAllUsers() {
+  print('\n=== ALL REGISTERED USERS ===');
+
+  int count = 1;
+  users.forEach((email, data) {
+    print('\n$count. ${data['name']}');
+    print('   Email: $email');
+    print('   Role: ${data['role']}');
+    count++;
+  });
+
+  print('\nTotal: ${users.length} users');
+}
+
+
+// ---------- VIEW ALL JOBS (Admin) ----------
+void viewAllJobs() {
+  print('\n=== ALL JOBS ON PLATFORM ===');
+
+  if (jobs.isEmpty) {
+    print('No jobs posted yet.');
+    return;
+  }
+
+  for (int i = 0; i < jobs.length; i++) {
+    print('\n${i + 1}. ${jobs[i]['title']}');
+    print('   Company: ${jobs[i]['company']}');
+    print('   Location: ${jobs[i]['location']}');
+    print('   Category: ${jobs[i]['category']}');
+    print('   Posted by: ${jobs[i]['postedBy']}');
+  }
+
+  print('\nTotal: ${jobs.length} jobs');
+}
+
+
