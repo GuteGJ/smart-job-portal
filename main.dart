@@ -3,6 +3,7 @@ import 'dart:io';
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
 List<Map<String, String>> jobs = [];
+List<Map<String, String>> applications = [];
 
 void main(){
 
@@ -159,6 +160,9 @@ bool login(){
   }
 }
 
+
+// ------- Show User Menu------------
+
 void showUserMenu(){
   bool inMenu = true;
 
@@ -190,9 +194,9 @@ void showUserMenu(){
         break;
       case'2':
       if (role == 'candidate'){
-        print('My Applications - Coming soon!');
+        myApplications();
       } else {
-        print('View Applicants - Coming soon!');
+        viewApplicants();
       }
       break;
     case '3':
@@ -207,23 +211,169 @@ void showUserMenu(){
   }while (inMenu);
 }
 
-void browseJobs(){
+// ---------- BROWSE JOBS (Candidate) ----------
+void browseJobs() {
   print('\n=== AVAILABLE JOBS ===');
 
-  if (jobs.isEmpty){
-    print('No jobs available.');
+  if (jobs.isEmpty) {
+    print('No jobs available yet.');
     return;
   }
 
+  // Show only jobs NOT posted by current user
+  List<int> availableIndexes = [];
+  int displayNumber = 1;
+
   for (int i = 0; i < jobs.length; i++) {
-    print('\n${i + 1}. ${jobs[i]['title']}');
-    print('  Company: ${jobs[i]['company']}');
-    print('  Location: ${jobs[i]['location']}');
-    print('  Salary: ${jobs[i]['salary']}');
-    print('  Category: ${jobs[i]['category']}');
-    print('  Posted by: ${jobs[i]['postedBy']}');
+    if (jobs[i]['postedBy'] != currentUser!['email']) {
+      availableIndexes.add(i);
+      print('\n$displayNumber. ${jobs[i]['title']}');
+      print('   Company: ${jobs[i]['company']}');
+      print('   Location: ${jobs[i]['location']}');
+      print('   Salary: ${jobs[i]['salary']}');
+      print('   Category: ${jobs[i]['category']}');
+      displayNumber++;
+    }
+  }
+
+  if (availableIndexes.isEmpty) {
+    print('\nAll jobs are posted by you!');
+    return;
+  }
+
+  // Ask if candidate wants to apply
+  print('\nEnter job number to apply (or 0 to go back): ');
+  String? choice = stdin.readLineSync();
+
+  if (choice == null || choice == '0') {
+    return;
+  }
+
+  int? selectedIndex = int.tryParse(choice);
+  if (selectedIndex == null || selectedIndex < 1 || selectedIndex > availableIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  // Get the actual job
+  int actualIndex = availableIndexes[selectedIndex - 1];
+  Map<String, String> selectedJob = jobs[actualIndex];
+
+  // Check if already applied
+  for (var app in applications) {
+    if (app['applicantEmail'] == currentUser!['email'] &&
+        app['jobTitle'] == selectedJob['title'] &&
+        app['jobCompany'] == selectedJob['company']) {
+      print('You have already applied for this job!');
+      return;
+    }
+  }
+
+  // Apply
+  applications.add({
+    'applicantEmail': currentUser!['email']!,
+    'applicantName': currentUser!['name']!,
+    'jobTitle': selectedJob['title']!,
+    'jobCompany': selectedJob['company']!,
+    'status': 'Applied',
+    'employerEmail': selectedJob['postedBy']!,
+  });
+
+  print('✅ Applied successfully for ${selectedJob['title']}!');
+}
+
+// ---------- MY APPLICATIONS (Candidate) ----------
+void myApplications() {
+  print('\n=== MY APPLICATIONS ===');
+
+  bool found = false;
+
+  for (int i = 0; i < applications.length; i++) {
+    if (applications[i]['applicantEmail'] == currentUser!['email']) {
+      found = true;
+      print('\n${i + 1}. ${applications[i]['jobTitle']}');
+      print('   Company: ${applications[i]['jobCompany']}');
+      print('   Status: ${applications[i]['status']}');
+    }
+  }
+
+  if (!found) {
+    print('No applications yet.');
   }
 }
+
+// ---------- VIEW APPLICANTS (Employer) ----------
+void viewApplicants() {
+  print('\n=== APPLICANTS FOR YOUR JOBS ===');
+
+  bool found = false;
+
+  for (int i = 0; i < applications.length; i++) {
+    if (applications[i]['employerEmail'] == currentUser!['email']) {
+      found = true;
+      print('\n${i + 1}. ${applications[i]['applicantName']}');
+      print('   Applied for: ${applications[i]['jobTitle']}');
+      print('   Status: ${applications[i]['status']}');
+    }
+  }
+
+  if (!found) {
+    print('No applicants yet.');
+    return;
+  }
+
+  // Option to change status
+  print('\nEnter application number to change status (or 0 to go back): ');
+  String? choice = stdin.readLineSync();
+
+  if (choice == null || choice == '0') {
+    return;
+  }
+
+  int? appIndex = int.tryParse(choice);
+  if (appIndex == null || appIndex < 1 || appIndex > applications.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = appIndex - 1;
+
+  // Check if this application belongs to this employer
+  if (applications[actualIndex]['employerEmail'] != currentUser!['email']) {
+    print('Invalid choice!');
+    return;
+  }
+
+  print('\n--- Change Status ---');
+  print('1. Under Review');
+  print('2. Shortlisted');
+  print('3. Rejected');
+  print('4. Hired');
+  print('Choose new status: ');
+
+  String? statusChoice = stdin.readLineSync();
+
+  switch (statusChoice) {
+    case '1':
+      applications[actualIndex]['status'] = 'Under Review';
+      break;
+    case '2':
+      applications[actualIndex]['status'] = 'Shortlisted';
+      break;
+    case '3':
+      applications[actualIndex]['status'] = 'Rejected';
+      break;
+    case '4':
+      applications[actualIndex]['status'] = 'Hired';
+      break;
+    default:
+      print('Invalid status!');
+      return;
+  }
+
+  print('✅ Status updated to: ${applications[actualIndex]['status']}');
+}
+
 
 //----------- Post A job (Employer) ----------
 
