@@ -1,0 +1,1 @@
+{"users":{"admin@jobportal.com":{"password":"admin123","name":"System Admin","role":"admin"},"gute@g":{"password":"11","name":"Gutex","role":"employer"}},"jobs":[{"title":"Flutter Developer","company":"GET","location":"Addis Ababa","salary":"20000","category":"Junior","postedBy":"gute@g"}],"applications":[]}

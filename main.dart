@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
@@ -14,9 +15,80 @@ void setupAdmin() {
   };
 }
 
+
+// ---------- Save Data to file ------------
+void saveData(){
+  // Put all our data into one big Map
+  Map<String, dynamic> allData = {
+    'users' : users,
+    'jobs' : jobs,
+    'applications' : applications,
+  };
+
+  // Convert to JSON string
+
+  String jsonString = jsonEncode(allData);
+
+  // Write to file
+  File('data.json').writeAsStringSync(jsonString);
+}
+
+// ------- LOAD DATA FROM FILE ------
+void loadData(){
+  File file = File('data.json');
+
+  // Check if file exists
+  if (!file.existsSync()) {
+    print('[INFO] NO saved data found. Starting fresh.');
+    return;
+  }
+
+  //Read the file
+  String jsonString = file.readAsStringSync();
+
+  //Convert JSON string back to Dart objects
+  Map<String, dynamic> allData = jsonDecode(jsonString);
+
+  // Restore users
+  if (allData['users']!=null) {
+    users = Map<String, Map<String, String>>.from(
+      (allData['users'] as Map).map(
+        (key, value) => MapEntry(
+          key.toString(),
+          Map<String, String>.from(value as Map),
+        ),
+      ),
+    );
+  }
+
+  //Restore jobs
+  if (allData['jobs'] != null){
+    jobs = List<Map<String, String>>.from(
+      (allData['jobs'] as List).map(
+        (item) => Map<String, String>.from(item as Map),
+      ),
+    );
+  }
+
+  // Restore applications
+  if (allData['applications'] != null){
+    applications = List<Map<String, String>>.from(
+      (allData['applications'] as List).map(
+        (item) => Map<String, String>.from(item as Map),
+      ),
+    );
+  }
+
+  print('Data loaded successfully!');
+}
+
+
+// ---- MAIN FUNCTION ----
+
 void main(){
 
   setupAdmin();
+  loadData();
 
   bool isRunning = true;
 
@@ -113,6 +185,7 @@ void register(){
     'role': role,
   };
   print('✅ Registration successful!');
+  saveData();
 }
 
 //----------Login Function--------
@@ -391,7 +464,9 @@ void browseJobs() {
   });
 
   print('✅ Applied successfully for ${selectedJob['title']}!');
+  saveData();
 }
+
 
 // ---------- MY APPLICATIONS (Candidate) ----------
 void myApplications() {
@@ -412,6 +487,7 @@ void myApplications() {
     print('No applications yet.');
   }
 }
+
 
 // ---------- VIEW APPLICANTS (Employer) ----------
 void viewApplicants() {
@@ -483,7 +559,9 @@ void viewApplicants() {
   }
 
   print('✅ Status updated to: ${applications[actualIndex]['status']}');
+  saveData();
 }
+
 
 
 //----------- Post A job (Employer) ----------
@@ -537,6 +615,7 @@ void postJob() {
   });
 
   print('✅ Job posted successfully!');
+  saveData();
 }
 
 // ---------- ADMIN DASHBOARD ----------
