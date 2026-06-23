@@ -249,20 +249,93 @@ void showUserMenu(){
 
 // ---------- BROWSE JOBS (Candidate) ----------
 void browseJobs() {
-  print('\n=== AVAILABLE JOBS ===');
+  print('\n=== JOB SEARCH & FILTER ===');
 
   if (jobs.isEmpty) {
     print('No jobs available yet.');
     return;
   }
 
-  // Show only jobs NOT posted by current user
-  List<int> availableIndexes = [];
+  // Step 1: Search keyword
+  print('Search keyword (or press Enter for all): ');
+  String? keyword = stdin.readLineSync();
+  if (keyword != null) {
+    keyword = keyword.toLowerCase().trim();
+  }
+
+  // Step 2: Filter by category
+  print('\nFilter by category (or press Enter for all): ');
+  
+  // Show available categories
+  Set<String> categories = {};
+  for (var job in jobs) {
+    if (job['postedBy'] != currentUser!['email']) {
+      categories.add(job['category']!);
+    }
+  }
+  
+  print('Available: ${categories.join(', ')}');
+  String? categoryFilter = stdin.readLineSync();
+  if (categoryFilter != null) {
+    categoryFilter = categoryFilter.trim();
+    if (categoryFilter.isEmpty) {
+      categoryFilter = 'all';
+    }
+  } else {
+    categoryFilter = 'all';
+  }
+
+  // Step 3: Filter by location
+  print('\nFilter by location (or press Enter for all): ');
+  
+  // Show available locations
+  Set<String> locations = {};
+  for (var job in jobs) {
+    if (job['postedBy'] != currentUser!['email']) {
+      locations.add(job['location']!);
+    }
+  }
+  
+  print('Available: ${locations.join(', ')}');
+  String? locationFilter = stdin.readLineSync();
+  if (locationFilter != null) {
+    locationFilter = locationFilter.trim();
+    if (locationFilter.isEmpty) {
+      locationFilter = 'all';
+    }
+  } else {
+    locationFilter = 'all';
+  }
+
+  // Step 4: Filter and display jobs
+  print('\n=== SEARCH RESULTS ===');
+  
+  List<int> matchingIndexes = [];
   int displayNumber = 1;
 
   for (int i = 0; i < jobs.length; i++) {
-    if (jobs[i]['postedBy'] != currentUser!['email']) {
-      availableIndexes.add(i);
+    // Skip own jobs
+    if (jobs[i]['postedBy'] == currentUser!['email']) {
+      continue;
+    }
+
+    // Check search keyword
+    bool matchesKeyword = keyword == null || keyword.isEmpty ||
+        jobs[i]['title']!.toLowerCase().contains(keyword) ||
+        jobs[i]['company']!.toLowerCase().contains(keyword) ||
+        jobs[i]['category']!.toLowerCase().contains(keyword);
+
+    // Check category filter
+    bool matchesCategory = categoryFilter == 'all' ||
+        jobs[i]['category']!.toLowerCase() == categoryFilter.toLowerCase();
+
+    // Check location filter
+    bool matchesLocation = locationFilter == 'all' ||
+        jobs[i]['location']!.toLowerCase() == locationFilter.toLowerCase();
+
+    // Show if all filters match
+    if (matchesKeyword && matchesCategory && matchesLocation) {
+      matchingIndexes.add(i);
       print('\n$displayNumber. ${jobs[i]['title']}');
       print('   Company: ${jobs[i]['company']}');
       print('   Location: ${jobs[i]['location']}');
@@ -272,10 +345,12 @@ void browseJobs() {
     }
   }
 
-  if (availableIndexes.isEmpty) {
-    print('\nAll jobs are posted by you!');
+  if (matchingIndexes.isEmpty) {
+    print('No jobs match your search criteria.');
     return;
   }
+
+  print('\nFound $displayNumber job(s)');
 
   // Ask if candidate wants to apply
   print('\nEnter job number to apply (or 0 to go back): ');
@@ -286,13 +361,13 @@ void browseJobs() {
   }
 
   int? selectedIndex = int.tryParse(choice);
-  if (selectedIndex == null || selectedIndex < 1 || selectedIndex > availableIndexes.length) {
+  if (selectedIndex == null || selectedIndex < 1 || selectedIndex > matchingIndexes.length) {
     print('Invalid choice!');
     return;
   }
 
   // Get the actual job
-  int actualIndex = availableIndexes[selectedIndex - 1];
+  int actualIndex = matchingIndexes[selectedIndex - 1];
   Map<String, String> selectedJob = jobs[actualIndex];
 
   // Check if already applied
