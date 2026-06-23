@@ -1,6 +1,7 @@
 import 'dart:io';
 
 Map<String, Map<String, String>> users = {};
+Map<String, String>? currentUser = null;
 
 void main(){
 
@@ -20,7 +21,11 @@ void main(){
       register();
       break;
     case '2':
-      login();
+      bool success = login();
+      if (success){
+        showUserMenu(); // Go to role-based menu
+
+      }
       break;
     case '3':
       print('Goddbye!');
@@ -82,6 +87,12 @@ void register(){
     return;
   }
 
+  if (role != 'candidate' && role != 'employer'){
+    print('Role must be "candidate" or "employer"!');
+    return;
+
+  }
+
   //Step 6: Add user to the map
   users[email] = {
     'password': password,
@@ -92,40 +103,105 @@ void register(){
 }
 
 //----------Login Function--------
-void login(){
+
+bool login(){
   print('\n--- Login ---');
 
-  //Step 1: Get email
+
+  print('Email: ');
   String? email = stdin.readLineSync();
 
   if(email == null || email.isEmpty){
     print('Email cannot be empty!');
-    return;
+
+    return false;
   }
 
-  //Step 2: check if email exists
+
   if (!users.containsKey(email)){
     print('Email not found! Please register first.');
-    return;
+
+    return false;
   }
 
-  //Step 3: Get password
+
   print('Password: ');
   String? password = stdin.readLineSync();
 
   if (password == null || password.isEmpty){
     print('Password cannot be empty!');
-    return;
+
+    return false;
   }
 
-  //Step 4: Check if password matches
-  if (users[email]!['password'] == password){
-    String name = users[email]!['name']!;
-    String role = users[email]!['role']!;
 
-    print('✅ Welcome back, $name!');
-    print('  Role: $role');
+
+  if (users[email]!['password'] == password){
+    // ✅ SET THE CURRENT USER HERE!
+    currentUser = {
+      'email': email,
+      'name': users[email]!['name']!,
+      'role': users[email]!['role']!,
+
+
+    };
+
+    print('✅ Welcome back, ${currentUser!['name']}!');
+    print('  Role: ${currentUser!['role']}');
+
+
+    return true;
   }else {
     print('❌ Incorrect password!');
+
+    return false;
   }
+}
+
+void showUserMenu(){
+  bool inMenu = true;
+
+  do{
+    String role = currentUser!['role']!;
+
+    if(role == 'candidate'){
+      print('\n=== CANDIDATE MANU ===');
+      print('1. Browse Jobs');
+      print('2. My Applications');
+      print('3. Logout');
+    }else if (role == 'employer'){
+      print('\n=== EMPLOYER MENU ===');
+      print('1. Post a Job');
+      print('2. View Applications');
+      print('3. Logout');
+    }
+
+    print('Choose an option: ');
+    String? input = stdin.readLineSync();
+
+    switch (input){
+      case '1':
+        if (role == 'candidate'){
+          print('Browsw Jobs - Coming soon!');
+        } else {
+          print('Post a Job - Coming soon!');
+        }
+        break;
+      case'2':
+      if (role == 'candidate'){
+        print('My Applications - Coming soon!');
+      } else {
+        print('View Applicants - Coming soon!');
+      }
+      break;
+    case '3':
+      print('Logged out. Goodbye, ${currentUser!['name']}');
+      currentUser = null;
+      inMenu = false;
+      break;
+    default:
+      print('Invalid choice.');
+    }
+
+  }while (inMenu);
 }
