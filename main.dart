@@ -374,9 +374,10 @@ void showUserMenu(){
       print('\n=== CANDIDATE MANU ===');
       print('1. Browse Jobs');
       print('2. My Applications');
-      print('3. My Bookmarks');
-      print('4. Profile');
-      print('5. Logout');
+      print('3. Withdraw Application');
+      print('4. My Bookmarks');
+      print('5. Profile');
+      print('6. Logout');
     }else if (role == 'admin') {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -395,7 +396,7 @@ void showUserMenu(){
     print('Choose an option: ');
     String? input = stdin.readLineSync();
 
-        switch (input) {
+    switch (input) {
       case '1':
         if (role == 'candidate') {
           browseJobs();
@@ -418,7 +419,7 @@ void showUserMenu(){
 
       case '3':
         if (role == 'candidate') {
-          myBookmarks();
+          withdrawApplication();
         } else if (role == 'admin') {
           viewAllJobs();
         } else {
@@ -426,9 +427,9 @@ void showUserMenu(){
         }
         break;
 
-            case '4':
+      case '4':
         if (role == 'candidate') {
-          editProfile();
+          myBookmarks();
         } else if (role == 'admin') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
@@ -440,10 +441,16 @@ void showUserMenu(){
 
       case '5':
         if (role == 'candidate') {
+          editProfile();
+        } else if (role == 'employer') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
           inMenu = false;
-        } else if (role == 'employer') {
+        }
+        break;
+
+      case '6':
+        if (role == 'candidate') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
           inMenu = false;
@@ -549,6 +556,21 @@ void browseJobs() {
 
     // Show if all filters match
     if (matchesKeyword && matchesCategory && matchesLocation) {
+
+      //skip closed jobs
+      if (jobs[i]['status'] == 'Closed'){
+        continue;
+      }
+
+      // skip expired jobs (auto-close)
+      String deadlineStr = jobs[i]['deadline'] ?? 'No deadline';
+      if (deadlineStr != 'No deadline') {
+        DateTime deadline = DateTime.parse(deadlineStr);
+        if (deadline.isBefore(DateTime.now())) {
+          continue; // skip expired jobs
+        }
+      }
+
       matchingIndexes.add(i);
       print('\n$displayNumber. ${jobs[i]['title']}');
       print('   Company: ${jobs[i]['company']}');
@@ -560,7 +582,7 @@ void browseJobs() {
       if (deadlineStr != 'No deadline') {
         DateTime deadline = DateTime.parse(deadlineStr);
         Duration remaining = deadline.difference(DateTime.now());
-        if (remaining.inDays == 0) {
+        if (remaining.inDays > 0) {
           print('   ⏰ Deadline: ${remaining.inDays} days left');
         } else if (remaining.inDays == 0) {
           print('   ⚠️ Deadline: TODAY!');
@@ -633,14 +655,7 @@ void browseJobs() {
     return;
   }
 
-  // Ask if candidate wants to apply
-  print('\nEnter job number to apply (or 0 to go back): ');
-  String? choice = stdin.readLineSync();
-
-  if (choice == null || choice == '0') {
-    return;
-  }
-
+    // ===== APPLY LOGIC (if not bookmark) =====
   int? selectedIndex = int.tryParse(choice);
   if (selectedIndex == null || selectedIndex < 1 || selectedIndex > matchingIndexes.length) {
     print('Invalid choice!');
@@ -749,6 +764,61 @@ void myApplications() {
 
 
 
+// ---------- WITHDRAW APPLICATION (Candidate) ----------
+void withdrawApplication() {
+  print('\n--- Withdraw Application ---');
+
+  // Find candidate's applications
+  List<int> myAppIndexes = [];
+
+  for (int i = 0; i < applications.length; i++) {
+    if (applications[i]['applicantEmail'] == currentUser!['email']) {
+      myAppIndexes.add(i);
+      print('\n${myAppIndexes.length}. ${applications[i]['jobTitle']}');
+      print('   Company: ${applications[i]['jobCompany']}');
+      print('   Status: ${applications[i]['status']}');
+    }
+  }
+
+  if (myAppIndexes.isEmpty) {
+    print('No applications to withdraw.');
+    return;
+  }
+
+  print('\nEnter number to withdraw (or 0 to cancel): ');
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myAppIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myAppIndexes[selected - 1];
+
+  // Can only withdraw if status is 'Applied' or 'Under Review'
+  String status = applications[actualIndex]['status']!;
+  if (status != 'Applied' && status != 'Under Review') {
+    print('Cannot withdraw! Status is: $status');
+    return;
+  }
+
+  print('Withdraw application for "${applications[actualIndex]['jobTitle']}"? (yes/no): ');
+  String? confirm = stdin.readLineSync();
+
+  if (confirm != null && confirm.toLowerCase() == 'yes') {
+    applications[actualIndex]['status'] = 'Withdrawn';
+    print('✅ Application withdrawn!');
+    saveData();
+  } else {
+    print('Cancelled.');
+  }
+}
+
+
+
+
 
 // ---------- VIEW APPLICANTS (Employer) ----------
 void viewApplicants() {
@@ -826,6 +896,8 @@ void viewApplicants() {
 
 
 
+
+
 //----------- Post A job (Employer) ----------
 
 void postJob() {
@@ -898,11 +970,146 @@ void postJob() {
     'category': category,
     'postedBy': currentUser!['email']!,
     'deadline': deadline?.toIso8601String() ?? 'No deadline',
+    'status': 'Open',
   });
 
   print('✅ Job posted successfully!');
   saveData();
 }
+
+
+
+
+// ---------- DELETE JOB (Employer) ----------
+void deleteJob(List<int> myJobIndexes) {
+  print('\n--- Delete Job ---');
+  print('Enter job number to delete (or 0 to cancel): ');
+
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myJobIndexes[selected - 1];
+
+  // Confirm deletion
+  print('Are you sure you want to delete "${jobs[actualIndex]['title']}"? (yes/no): ');
+  String? confirm = stdin.readLineSync();
+
+  if (confirm != null && confirm.toLowerCase() == 'yes') {
+    // Also remove related applications
+    String jobTitle = jobs[actualIndex]['title']!;
+    String jobCompany = jobs[actualIndex]['company']!;
+
+    applications.removeWhere((app) =>
+        app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
+
+    // Remove the job
+    jobs.removeAt(actualIndex);
+
+    print('✅ Job deleted successfully!');
+    saveData();
+  } else {
+    print('Deletion cancelled.');
+  }
+}
+
+
+
+
+// ---------- MY POSTED JOBS (Employer) ----------
+void myPostedJobs() {
+  print('\n=== MY POSTED JOBS ===');
+
+  // Find jobs posted by current employer
+  List<int> myJobIndexes = [];
+
+  for (int i = 0; i < jobs.length; i++) {
+    if (jobs[i]['postedBy'] == currentUser!['email']) {
+      myJobIndexes.add(i);
+      print('\n${myJobIndexes.length}. ${jobs[i]['title']}');
+      print('   Company: ${jobs[i]['company']}');
+      print('   Location: ${jobs[i]['location']}');
+      print('   Salary: ${jobs[i]['salary']}');
+      print('   Category: ${jobs[i]['category']}');
+      print('   Status: ${jobs[i]['status'] ?? 'Open'}');
+    }
+  }
+
+  if (myJobIndexes.isEmpty) {
+    print('You haven\'t posted any jobs yet.');
+    return;
+  }
+
+  print('\n--- Options ---');
+  print('1. Edit a Job');
+  print('2. Delete a Job');
+  print('3. Close a Job');
+  print('4. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  switch (option) {
+    case '1':
+      editJob(myJobIndexes);
+      break;
+    case '2':
+      deleteJob(myJobIndexes);
+      break;
+    case '3' :
+      closeJob(myJobIndexes);
+      break;
+    case '4':
+      return;
+    default:
+      print('Invalid option!');
+  }
+}
+
+
+
+
+
+
+// ---------- CLOSE JOB (Employer) ----------
+void closeJob(List<int> myJobIndexes) {
+  print('\n--- Close a Job ---');
+  print('Enter job number to close (or 0 to cancel): ');
+
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myJobIndexes[selected - 1];
+
+  if (jobs[actualIndex]['status'] == 'Closed') {
+    print('Job is already closed!');
+    return;
+  }
+
+  print('Close "${jobs[actualIndex]['title']}"? (yes/no): ');
+  String? confirm = stdin.readLineSync();
+
+  if (confirm != null && confirm.toLowerCase() == 'yes') {
+    jobs[actualIndex]['status'] = 'Closed';
+    print('🔒 Job closed! No more applications accepted.');
+    saveData();
+  } else {
+    print('Cancelled.');
+  }
+}
+
+
 
 
 
@@ -1076,50 +1283,7 @@ void viewAllJobs() {
 
 
 
-// ---------- MY POSTED JOBS (Employer) ----------
-void myPostedJobs() {
-  print('\n=== MY POSTED JOBS ===');
 
-  // Find jobs posted by current employer
-  List<int> myJobIndexes = [];
-
-  for (int i = 0; i < jobs.length; i++) {
-    if (jobs[i]['postedBy'] == currentUser!['email']) {
-      myJobIndexes.add(i);
-      print('\n${myJobIndexes.length}. ${jobs[i]['title']}');
-      print('   Company: ${jobs[i]['company']}');
-      print('   Location: ${jobs[i]['location']}');
-      print('   Salary: ${jobs[i]['salary']}');
-      print('   Category: ${jobs[i]['category']}');
-    }
-  }
-
-  if (myJobIndexes.isEmpty) {
-    print('You haven\'t posted any jobs yet.');
-    return;
-  }
-
-  print('\n--- Options ---');
-  print('1. Edit a Job');
-  print('2. Delete a Job');
-  print('3. Go Back');
-  print('Choose: ');
-
-  String? option = stdin.readLineSync();
-
-  switch (option) {
-    case '1':
-      editJob(myJobIndexes);
-      break;
-    case '2':
-      deleteJob(myJobIndexes);
-      break;
-    case '3':
-      return;
-    default:
-      print('Invalid option!');
-  }
-}
 
 
 
@@ -1185,43 +1349,7 @@ void editJob(List<int> myJobIndexes) {
 
 
 
-// ---------- DELETE JOB (Employer) ----------
-void deleteJob(List<int> myJobIndexes) {
-  print('\n--- Delete Job ---');
-  print('Enter job number to delete (or 0 to cancel): ');
 
-  String? choice = stdin.readLineSync();
-  if (choice == null || choice == '0') return;
-
-  int? selected = int.tryParse(choice);
-  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
-    print('Invalid choice!');
-    return;
-  }
-
-  int actualIndex = myJobIndexes[selected - 1];
-
-  // Confirm deletion
-  print('Are you sure you want to delete "${jobs[actualIndex]['title']}"? (yes/no): ');
-  String? confirm = stdin.readLineSync();
-
-  if (confirm != null && confirm.toLowerCase() == 'yes') {
-    // Also remove related applications
-    String jobTitle = jobs[actualIndex]['title']!;
-    String jobCompany = jobs[actualIndex]['company']!;
-
-    applications.removeWhere((app) =>
-        app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
-
-    // Remove the job
-    jobs.removeAt(actualIndex);
-
-    print('✅ Job deleted successfully!');
-    saveData();
-  } else {
-    print('Deletion cancelled.');
-  }
-}
 
 
 
