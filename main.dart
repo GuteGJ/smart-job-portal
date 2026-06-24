@@ -5,14 +5,22 @@ Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
 List<Map<String, String>> jobs = [];
 List<Map<String, String>> applications = [];
+List<Map<String, String>> bookmarks = [];
+
+
 
 // Pre-load the admin account
 void setupAdmin() {
-  users['admin@jobportal.com'] = {
-    'password': 'admin123',
-    'name': 'System Admin',
-    'role': 'admin',
-  };
+  if (!users.containsKey('admin@jobportal.com')){
+    users['admin@jobportal.com'] = {
+      'password': 'admin123',
+      'name': 'System Admin',
+      'role': 'admin',
+      'securityQuestion': 'What is the admin password?',
+      'securityAnswer': 'admin123',
+    };
+
+  }
 }
 
 
@@ -25,6 +33,7 @@ void saveData(){
     'users' : users,
     'jobs' : jobs,
     'applications' : applications,
+    'bookmarks': bookmarks,
   };
 
   // Convert to JSON string
@@ -79,6 +88,15 @@ void loadData(){
   if (allData['applications'] != null){
     applications = List<Map<String, String>>.from(
       (allData['applications'] as List).map(
+        (item) => Map<String, String>.from(item as Map),
+      ),
+    );
+  }
+
+  // Restore bookmarks
+  if (allData['bookmarks'] != null) {
+    bookmarks = List<Map<String, String>>.from(
+      (allData['bookmarks'] as List).map(
         (item) => Map<String, String>.from(item as Map),
       ),
     );
@@ -356,8 +374,9 @@ void showUserMenu(){
       print('\n=== CANDIDATE MANU ===');
       print('1. Browse Jobs');
       print('2. My Applications');
-      print('3. Profile');
-      print('4. Logout');
+      print('3. My Bookmarks');
+      print('4. Profile');
+      print('5. Logout');
     }else if (role == 'admin') {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -376,7 +395,7 @@ void showUserMenu(){
     print('Choose an option: ');
     String? input = stdin.readLineSync();
 
-    switch (input) {
+        switch (input) {
       case '1':
         if (role == 'candidate') {
           browseJobs();
@@ -386,6 +405,7 @@ void showUserMenu(){
           postJob();
         }
         break;
+
       case '2':
         if (role == 'candidate') {
           myApplications();
@@ -395,42 +415,44 @@ void showUserMenu(){
           viewApplicants();
         }
         break;
-        case '3':
-          if (role == 'candidate'){
-            editProfile();
-          }else if (role == 'admin'){
-            viewAllJobs();
-          }else {
-            myPostedJobs();
-          }
-          break;
-        case '4':
-          if (role == 'candidate') {
-            // Logout for candidate
-            print('Logged out. Goodbye, ${currentUser!['name']}!');
-            currentUser = null;
-            inMenu = false;
-          } else if (role == 'admin') {
-            // Logout for admin
-            print('Logged out. Goodbye, ${currentUser!['name']}!');
-            currentUser = null;
-            inMenu = false;
-          }else {
-            // profile for employer
-            editProfile();
-          }
-          break;
-        case '5':
-          if (role == 'employer'){
-            //Logout for employer
-            print('Logged out. Goodbye, ${currentUser!['name']}!');
-            currentUser = null;
-            inMenu = false;
-          }
-          break;
-        default:
-          print('Invalid choice.');
-      }
+
+      case '3':
+        if (role == 'candidate') {
+          myBookmarks();
+        } else if (role == 'admin') {
+          viewAllJobs();
+        } else {
+          myPostedJobs();
+        }
+        break;
+
+            case '4':
+        if (role == 'candidate') {
+          editProfile();
+        } else if (role == 'admin') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        } else {
+          editProfile();
+        }
+        break;
+
+      case '5':
+        if (role == 'candidate') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        } else if (role == 'employer') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        }
+        break;
+
+      default:
+        print('Invalid choice.');
+    }
 
   }while (inMenu);
 }
@@ -533,6 +555,20 @@ void browseJobs() {
       print('   Location: ${jobs[i]['location']}');
       print('   Salary: ${jobs[i]['salary']}');
       print('   Category: ${jobs[i]['category']}');
+
+      String deadlineStr = jobs[i]['deadline'] ?? 'No deadline';
+      if (deadlineStr != 'No deadline') {
+        DateTime deadline = DateTime.parse(deadlineStr);
+        Duration remaining = deadline.difference(DateTime.now());
+        if (remaining.inDays == 0) {
+          print('   ⏰ Deadline: ${remaining.inDays} days left');
+        } else if (remaining.inDays == 0) {
+          print('   ⚠️ Deadline: TODAY!');
+        } else {
+          print('   ❌ Deadline: EXPIRED');
+        }
+        
+      }
       displayNumber++;
     }
   }
@@ -543,6 +579,59 @@ void browseJobs() {
   }
 
   print('\nFound $displayNumber job(s)');
+
+  // ===== NEW: 'Options =====
+
+  print('\n--- Options ---');
+  print('Enter job number to APPLY');
+  print('Or type B<number> to BOOKMARK (e.g., B1)');
+  print('Or type 0 to go back');
+  print('Choose: ');
+  String? choice = stdin.readLineSync();
+
+  if (choice == null || choice == '0') {
+    return;
+  }
+
+    // Check if user wants to bookmark
+  if (choice.startsWith('B') || choice.startsWith('b')) {
+    String numPart = choice.substring(1);
+    int? bookmarkIndex = int.tryParse(numPart);
+    
+    if (bookmarkIndex == null || bookmarkIndex < 1 || bookmarkIndex > matchingIndexes.length) {
+      print('Invalid choice!');
+      return;
+    }
+
+    int actualIndex = matchingIndexes[bookmarkIndex - 1];
+    Map<String, String> selectedJob = jobs[actualIndex];
+
+    // Check if already bookmarked
+    bool alreadyBookmarked = false;
+    for (var bm in bookmarks) {
+      if (bm['candidateEmail'] == currentUser!['email'] &&
+          bm['jobTitle'] == selectedJob['title'] &&
+          bm['jobCompany'] == selectedJob['company']) {
+        alreadyBookmarked = true;
+        break;
+      }
+    }
+
+    if (alreadyBookmarked) {
+      print('Already bookmarked!');
+    } else {
+      bookmarks.add({
+        'candidateEmail': currentUser!['email']!,
+        'jobTitle': selectedJob['title']!,
+        'jobCompany': selectedJob['company']!,
+        'location': selectedJob['location']!,
+        'category': selectedJob['category']!,
+      });
+      print('🔖 Bookmarked "${selectedJob['title']}"!');
+      saveData();
+    }
+    return;
+  }
 
   // Ask if candidate wants to apply
   print('\nEnter job number to apply (or 0 to go back): ');
@@ -585,6 +674,55 @@ void browseJobs() {
   print('✅ Applied successfully for ${selectedJob['title']}!');
   saveData();
 }
+
+
+
+
+// ---------- MY BOOKMARKS (Candidate) ----------
+void myBookmarks() {
+  print('\n=== MY BOOKMARKED JOBS ===');
+
+  bool found = false;
+
+  for (int i = 0; i < bookmarks.length; i++) {
+    if (bookmarks[i]['candidateEmail'] == currentUser!['email']) {
+      found = true;
+      print('\n${i + 1}. ${bookmarks[i]['jobTitle']}');
+      print('   Company: ${bookmarks[i]['jobCompany']}');
+      print('   Location: ${bookmarks[i]['location']}');
+      print('   Category: ${bookmarks[i]['category']}');
+    }
+  }
+
+  if (!found) {
+    print('No bookmarked jobs yet.');
+    return;
+  }
+
+  print('\n--- Options ---');
+  print('1. Remove a Bookmark');
+  print('2. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  if (option == '1') {
+    print('Enter bookmark number to remove (or 0 to cancel): ');
+    String? choice = stdin.readLineSync();
+    if (choice == null || choice == '0') return;
+
+    int? index = int.tryParse(choice);
+    if (index == null || index < 1 || index > bookmarks.length) {
+      print('Invalid choice!');
+      return;
+    }
+
+    bookmarks.removeAt(index - 1);
+    print('🔖 Bookmark removed!');
+    saveData();
+  }
+}
+
 
 
 
@@ -728,6 +866,29 @@ void postJob() {
     return;
   }
 
+  print('Application Deadline (YYY-MM-DD): ');
+  String? deadlineInput = stdin.readLineSync();
+
+  DateTime? deadline;
+  if (deadlineInput != null && deadlineInput.isNotEmpty) {
+    try {
+      List<String> parts = deadlineInput.split('-');
+      int year = int.parse(parts[0]);
+      int month = int.parse(parts[1]);
+      int day = int.parse(parts[2]);
+      deadline = DateTime(year, month, day);
+
+      if (deadline.isBefore(DateTime.now())) {
+        print('⚠️ Warning: Deadline is in the past!');
+      }
+    }catch (e) {
+      print('Invalid date format! Using no deadline.');
+      deadline = null;
+    }
+  }
+
+
+
   // Add job to the list
   jobs.add({
     'title': title,
@@ -736,6 +897,7 @@ void postJob() {
     'salary': salary,
     'category': category,
     'postedBy': currentUser!['email']!,
+    'deadline': deadline?.toIso8601String() ?? 'No deadline',
   });
 
   print('✅ Job posted successfully!');
