@@ -6,6 +6,8 @@ Map<String, String>? currentUser = null;
 List<Map<String, String>> jobs = [];
 List<Map<String, String>> applications = [];
 List<Map<String, String>> bookmarks = [];
+List<String> jobCategories = [];
+Map<String, Map<String, String>> companyProfiles = {};
 
 
 
@@ -34,6 +36,8 @@ void saveData(){
     'jobs' : jobs,
     'applications' : applications,
     'bookmarks': bookmarks,
+    'jobCategories': jobCategories,
+    'companyProfiles': companyProfiles,
   };
 
   // Convert to JSON string
@@ -102,8 +106,46 @@ void loadData(){
     );
   }
 
+    // Restore categories
+  if (allData['jobCategories'] != null) {
+    jobCategories = List<String>.from(allData['jobCategories'] as List);
+  }
+
+  // Restore company profiles
+  if (allData['companyProfiles'] != null) {
+    companyProfiles = Map<String, Map<String, String>>.from(
+      (allData['companyProfiles'] as Map).map(
+        (key, value) => MapEntry(
+          key.toString(),
+          Map<String, String>.from(value as Map),
+        ),
+      ),
+    );
+  }
+
   print('Data loaded successfully!');
 }
+
+
+
+
+// ---------- SEED DEFAULT CATEGORIES ----------
+void seedCategories() {
+  if (jobCategories.isEmpty) {
+    jobCategories.addAll([
+      'Information Technology',
+      'Design & Creative',
+      'Marketing & Sales',
+      'Finance & Accounting',
+      'Education & Training',
+      'Healthcare',
+      'Engineering',
+      'Customer Service',
+    ]);
+  }
+}
+
+
 
 
 
@@ -112,6 +154,7 @@ void loadData(){
 void main(){
 
   setupAdmin();
+  seedCategories();
   loadData();
 
   bool isRunning = true;
@@ -383,14 +426,16 @@ void showUserMenu(){
       print('1. Dashboard & Analytics');
       print('2. View All Users');
       print('3. View All Jobs');
-      print('4. Logout');
+      print('4. Manage Categories');
+      print('5. Logout');
     }else if (role == 'employer'){
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
       print('2. View Applications');
       print('3. My Posted Jobs');
-      print('4. Profile');
-      print('5. Logout');
+      print('4. Company Profile');
+      print('5. Profile');
+      print('6. Logout');
     }
 
     print('Choose an option: ');
@@ -427,30 +472,34 @@ void showUserMenu(){
         }
         break;
 
-      case '4':
+            case '4':
         if (role == 'candidate') {
           myBookmarks();
         } else if (role == 'admin') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
-          currentUser = null;
-          inMenu = false;
+          manageCategories();   // NEW
         } else {
-          editProfile();
+          companyProfile();
         }
         break;
 
       case '5':
         if (role == 'candidate') {
           editProfile();
-        } else if (role == 'employer') {
+        } else if (role == 'admin') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
           inMenu = false;
+        } else if (role == 'employer') {
+          editProfile();
         }
         break;
 
       case '6':
         if (role == 'candidate') {
+          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          currentUser = null;
+          inMenu = false;
+        } else if (role == 'employer') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
           inMenu = false;
@@ -557,17 +606,19 @@ void browseJobs() {
     // Show if all filters match
     if (matchesKeyword && matchesCategory && matchesLocation) {
 
-      //skip closed jobs
-      if (jobs[i]['status'] == 'Closed'){
+      // Skip closed jobs
+      if (jobs[i]['status'] == 'Closed') {
         continue;
       }
 
-      // skip expired jobs (auto-close)
+      // Get deadline ONCE
       String deadlineStr = jobs[i]['deadline'] ?? 'No deadline';
+      
+      // Skip expired jobs (auto-close)
       if (deadlineStr != 'No deadline') {
         DateTime deadline = DateTime.parse(deadlineStr);
         if (deadline.isBefore(DateTime.now())) {
-          continue; // skip expired jobs
+          continue; // Skip expired jobs
         }
       }
 
@@ -578,7 +629,7 @@ void browseJobs() {
       print('   Salary: ${jobs[i]['salary']}');
       print('   Category: ${jobs[i]['category']}');
 
-      String deadlineStr = jobs[i]['deadline'] ?? 'No deadline';
+      // Display deadline (reuse the same variable)
       if (deadlineStr != 'No deadline') {
         DateTime deadline = DateTime.parse(deadlineStr);
         Duration remaining = deadline.difference(DateTime.now());
@@ -589,8 +640,8 @@ void browseJobs() {
         } else {
           print('   ❌ Deadline: EXPIRED');
         }
-        
       }
+      
       displayNumber++;
     }
   }
@@ -931,11 +982,29 @@ void postJob() {
     return;
   }
 
-  print('Category: ');
-  String? category = stdin.readLineSync();
-  if (category == null || category.isEmpty) {
+  // Show available categories
+  print('\nAvailable Categories:');
+  for (int i = 0; i < jobCategories.length; i++) {
+    print('  ${i + 1}. ${jobCategories[i]}');
+  }
+  print('Choose category number (or type custom): ');
+  String? categoryInput = stdin.readLineSync();
+
+  String category;
+  if (categoryInput == null || categoryInput.isEmpty) {
     print('Category cannot be empty!');
     return;
+  }
+
+  int? catIndex = int.tryParse(categoryInput);
+  if (catIndex != null && catIndex >= 1 && catIndex <= jobCategories.length) {
+    category = jobCategories[catIndex - 1];
+  } else {
+    category = categoryInput; // Custom category
+    if (!jobCategories.contains(category)) {
+      jobCategories.add(category);
+      print('🆕 New category added: $category');
+    }
   }
 
   print('Application Deadline (YYY-MM-DD): ');
@@ -1073,6 +1142,64 @@ void myPostedJobs() {
 
 
 
+// ---------- EDIT JOB (Employer) ----------
+void editJob(List<int> myJobIndexes) {
+  print('\n--- Edit Job ---');
+  print('Enter job number to edit (or 0 to cancel): ');
+
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myJobIndexes[selected - 1];
+
+  print('\nLeave field blank to keep current value.\n');
+
+  // Title
+  print('New Title [${jobs[actualIndex]['title']}]: ');
+  String? newTitle = stdin.readLineSync();
+  if (newTitle != null && newTitle.isNotEmpty) {
+    jobs[actualIndex]['title'] = newTitle;
+  }
+
+  // Company
+  print('New Company [${jobs[actualIndex]['company']}]: ');
+  String? newCompany = stdin.readLineSync();
+  if (newCompany != null && newCompany.isNotEmpty) {
+    jobs[actualIndex]['company'] = newCompany;
+  }
+
+  // Location
+  print('New Location [${jobs[actualIndex]['location']}]: ');
+  String? newLocation = stdin.readLineSync();
+  if (newLocation != null && newLocation.isNotEmpty) {
+    jobs[actualIndex]['location'] = newLocation;
+  }
+
+  // Salary
+  print('New Salary [${jobs[actualIndex]['salary']}]: ');
+  String? newSalary = stdin.readLineSync();
+  if (newSalary != null && newSalary.isNotEmpty) {
+    jobs[actualIndex]['salary'] = newSalary;
+  }
+
+  // Category
+  print('New Category [${jobs[actualIndex]['category']}]: ');
+  String? newCategory = stdin.readLineSync();
+  if (newCategory != null && newCategory.isNotEmpty) {
+    jobs[actualIndex]['category'] = newCategory;
+  }
+
+  print('✅ Job updated successfully!');
+  saveData();
+}
+
+
 
 
 
@@ -1108,6 +1235,78 @@ void closeJob(List<int> myJobIndexes) {
     print('Cancelled.');
   }
 }
+
+
+
+
+
+// ---------- COMPANY PROFILE (Employer) ----------
+void companyProfile() {
+  String email = currentUser!['email']!;
+
+  print('\n=== COMPANY PROFILE ===');
+
+  if (companyProfiles.containsKey(email)) {
+    // Show existing profile
+    var profile = companyProfiles[email]!;
+    print('Company Name: ${profile['companyName']}');
+    print('Industry: ${profile['industry']}');
+    print('Website: ${profile['website']}');
+    print('Description: ${profile['description']}');
+    print('Employees: ${profile['employees']}');
+  } else {
+    print('No company profile yet.');
+  }
+
+  print('\n--- Options ---');
+  print('1. Create/Edit Profile');
+  print('2. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  if (option == '1') {
+    editCompanyProfile(email);
+  }
+}
+
+void editCompanyProfile(String email) {
+  print('\n--- Edit Company Profile ---');
+  print('Leave blank to keep current value.\n');
+
+  String currentName = companyProfiles[email]?['companyName'] ?? '';
+  String currentIndustry = companyProfiles[email]?['industry'] ?? '';
+  String currentWebsite = companyProfiles[email]?['website'] ?? '';
+  String currentDesc = companyProfiles[email]?['description'] ?? '';
+  String currentEmployees = companyProfiles[email]?['employees'] ?? '';
+
+  print('Company Name [$currentName]: ');
+  String? name = stdin.readLineSync();
+
+  print('Industry [$currentIndustry]: ');
+  String? industry = stdin.readLineSync();
+
+  print('Website [$currentWebsite]: ');
+  String? website = stdin.readLineSync();
+
+  print('Description [$currentDesc]: ');
+  String? description = stdin.readLineSync();
+
+  print('Number of Employees [$currentEmployees]: ');
+  String? employees = stdin.readLineSync();
+
+  companyProfiles[email] = {
+    'companyName': name != null && name.isNotEmpty ? name : currentName,
+    'industry': industry != null && industry.isNotEmpty ? industry : currentIndustry,
+    'website': website != null && website.isNotEmpty ? website : currentWebsite,
+    'description': description != null && description.isNotEmpty ? description : currentDesc,
+    'employees': employees != null && employees.isNotEmpty ? employees : currentEmployees,
+  };
+
+  print('✅ Company profile updated!');
+  saveData();
+}
+
 
 
 
@@ -1282,69 +1481,57 @@ void viewAllJobs() {
 
 
 
+// ---------- MANAGE CATEGORIES (Admin) ----------
+void manageCategories() {
+  print('\n=== MANAGE JOB CATEGORIES ===');
 
-
-
-
-
-
-
-// ---------- EDIT JOB (Employer) ----------
-void editJob(List<int> myJobIndexes) {
-  print('\n--- Edit Job ---');
-  print('Enter job number to edit (or 0 to cancel): ');
-
-  String? choice = stdin.readLineSync();
-  if (choice == null || choice == '0') return;
-
-  int? selected = int.tryParse(choice);
-  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
-    print('Invalid choice!');
-    return;
+  for (int i = 0; i < jobCategories.length; i++) {
+    print('${i + 1}. ${jobCategories[i]}');
   }
 
-  int actualIndex = myJobIndexes[selected - 1];
+  print('\n--- Options ---');
+  print('1. Add Category');
+  print('2. Remove Category');
+  print('3. Go Back');
+  print('Choose: ');
 
-  print('\nLeave field blank to keep current value.\n');
+  String? option = stdin.readLineSync();
 
-  // Title
-  print('New Title [${jobs[actualIndex]['title']}]: ');
-  String? newTitle = stdin.readLineSync();
-  if (newTitle != null && newTitle.isNotEmpty) {
-    jobs[actualIndex]['title'] = newTitle;
+  switch (option) {
+    case '1':
+      print('Enter new category name: ');
+      String? newCat = stdin.readLineSync();
+      if (newCat != null && newCat.isNotEmpty) {
+        if (jobCategories.contains(newCat)) {
+          print('Category already exists!');
+        } else {
+          jobCategories.add(newCat);
+          print('✅ Category added: $newCat');
+          saveData();
+        }
+      }
+      break;
+    case '2':
+      print('Enter category number to remove: ');
+      String? numStr = stdin.readLineSync();
+      int? index = int.tryParse(numStr ?? '');
+      if (index != null && index >= 1 && index <= jobCategories.length) {
+        String removed = jobCategories.removeAt(index - 1);
+        print('✅ Category removed: $removed');
+        saveData();
+      } else {
+        print('Invalid number!');
+      }
+      break;
+    case '3':
+      return;
   }
-
-  // Company
-  print('New Company [${jobs[actualIndex]['company']}]: ');
-  String? newCompany = stdin.readLineSync();
-  if (newCompany != null && newCompany.isNotEmpty) {
-    jobs[actualIndex]['company'] = newCompany;
-  }
-
-  // Location
-  print('New Location [${jobs[actualIndex]['location']}]: ');
-  String? newLocation = stdin.readLineSync();
-  if (newLocation != null && newLocation.isNotEmpty) {
-    jobs[actualIndex]['location'] = newLocation;
-  }
-
-  // Salary
-  print('New Salary [${jobs[actualIndex]['salary']}]: ');
-  String? newSalary = stdin.readLineSync();
-  if (newSalary != null && newSalary.isNotEmpty) {
-    jobs[actualIndex]['salary'] = newSalary;
-  }
-
-  // Category
-  print('New Category [${jobs[actualIndex]['category']}]: ');
-  String? newCategory = stdin.readLineSync();
-  if (newCategory != null && newCategory.isNotEmpty) {
-    jobs[actualIndex]['category'] = newCategory;
-  }
-
-  print('✅ Job updated successfully!');
-  saveData();
 }
+
+
+
+
+
 
 
 
