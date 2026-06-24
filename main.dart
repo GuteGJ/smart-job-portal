@@ -16,6 +16,8 @@ void setupAdmin() {
 }
 
 
+
+
 // ---------- Save Data to file ------------
 void saveData(){
   // Put all our data into one big Map
@@ -32,6 +34,9 @@ void saveData(){
   // Write to file
   File('data.json').writeAsStringSync(jsonString);
 }
+
+
+
 
 // ------- LOAD DATA FROM FILE ------
 void loadData(){
@@ -83,6 +88,7 @@ void loadData(){
 }
 
 
+
 // ---- MAIN FUNCTION ----
 
 void main(){
@@ -96,7 +102,8 @@ void main(){
     print ('=== SMART JOB PORTAL');
     print ('1, Register');
     print ('2, Login');
-    print ('3, Exit');
+    print ('3, Forgot Password');
+    print ('4, Exit');
     print ('Choose an option: ');
   
   String? input = stdin.readLineSync();
@@ -113,6 +120,9 @@ void main(){
       }
       break;
     case '3':
+      forgotPassword();
+      break;
+    case '4':
       print('Goddbye!');
       isRunning =false;
       break;
@@ -124,6 +134,8 @@ void main(){
 
 }
 
+
+
 //........Register Function...........
 
 void register(){
@@ -133,19 +145,17 @@ void register(){
   print('Email: ');
   String? email = stdin.readLineSync();
 
-  //Check if email is empty
   if (email == null || email.isEmpty){
     print('Email cannot be empty');
     return;
   }
 
-  //Step 2: Check if email already exists
   if (users.containsKey(email)){
     print('Email already Registered!');
     return;
   }
 
-  //Step 3: Get password
+  //step 2: Get password
   print('Password: ');
   String? password = stdin.readLineSync();
 
@@ -154,7 +164,7 @@ void register(){
     return;
   }
 
-  //Step 4: Get name
+  //step 3: Get name
   print('Name: ');
   String? name = stdin.readLineSync();
 
@@ -163,7 +173,7 @@ void register(){
     return;
   }
 
-  //Step 5: Get role
+  //step 4: Get role
   print('Role (candidate/employer):');
   String? role = stdin.readLineSync();
 
@@ -175,18 +185,40 @@ void register(){
   if (role != 'candidate' && role != 'employer'){
     print('Role must be "candidate" or "employer"!');
     return;
-
   }
 
-  //Step 6: Add user to the map
+  // ===== NEW: Security Question =====
+  print('Security Question (for password reset): ');
+  String? securityQuestion = stdin.readLineSync();
+
+  if (securityQuestion == null || securityQuestion.isEmpty){
+    print('Security question cannot be empty!');
+    return;
+  }
+
+  print('Answer: ');
+  String? securityAnswer = stdin.readLineSync();
+
+  if (securityAnswer == null || securityAnswer.isEmpty){
+    print('Answer cannot be empty!');
+    return;
+  }
+  // ===== END NEW =====
+
+  // Add user to the map
   users[email] = {
     'password': password,
     'name': name,
     'role': role,
+    'securityQuestion': securityQuestion,   // NEW
+    'securityAnswer': securityAnswer.toLowerCase(), // NEW
   };
   print('✅ Registration successful!');
   saveData();
 }
+
+
+
 
 //----------Login Function--------
 
@@ -248,6 +280,65 @@ bool login(){
 
 
 
+// ---------- FORGOT PASSWORD ----------
+void forgotPassword() {
+  print('\n--- Forgot Password ---');
+
+  print('Enter your registered email: ');
+  String? email = stdin.readLineSync();
+
+  if (email == null || email.isEmpty) {
+    print('Email cannot be empty!');
+    return;
+  }
+
+  if (!users.containsKey(email)) {
+    print('Email not found!');
+    return;
+  }
+
+  // Show security question
+  print('\nSecurity Question: ${users[email]!['securityQuestion']}');
+  print('Your answer: ');
+  String? answer = stdin.readLineSync();
+
+  if (answer == null || answer.isEmpty) {
+    print('Answer cannot be empty!');
+    return;
+  }
+
+  // Check answer (case-insensitive)
+  if (answer.toLowerCase() != users[email]!['securityAnswer']) {
+    print('❌ Incorrect answer!');
+    return;
+  }
+
+  // Allow password reset
+  print('\n✅ Answer correct!');
+  print('Enter new password: ');
+  String? newPassword = stdin.readLineSync();
+
+  if (newPassword == null || newPassword.isEmpty) {
+    print('Password cannot be empty!');
+    return;
+  }
+
+  print('Confirm new password: ');
+  String? confirmPassword = stdin.readLineSync();
+
+  if (newPassword != confirmPassword) {
+    print('Passwords do not match!');
+    return;
+  }
+
+  // Update password
+  users[email]!['password'] = newPassword;
+  print('✅ Password reset successful!');
+  saveData();
+}
+
+
+
 
 
 
@@ -265,7 +356,8 @@ void showUserMenu(){
       print('\n=== CANDIDATE MANU ===');
       print('1. Browse Jobs');
       print('2. My Applications');
-      print('3. Logout');
+      print('3. Profile');
+      print('4. Logout');
     }else if (role == 'admin') {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -277,7 +369,8 @@ void showUserMenu(){
       print('1. Post a Job');
       print('2. View Applications');
       print('3. My Posted Jobs');
-      print('4. Logout');
+      print('4. Profile');
+      print('5. Logout');
     }
 
     print('Choose an option: ');
@@ -303,22 +396,33 @@ void showUserMenu(){
         }
         break;
         case '3':
+          if (role == 'candidate'){
+            editProfile();
+          }else if (role == 'admin'){
+            viewAllJobs();
+          }else {
+            myPostedJobs();
+          }
+          break;
+        case '4':
           if (role == 'candidate') {
+            // Logout for candidate
             print('Logged out. Goodbye, ${currentUser!['name']}!');
             currentUser = null;
             inMenu = false;
           } else if (role == 'admin') {
-            viewAllJobs();
-          } else {
-            myPostedJobs(); // ← NEW for employer
-          }
-          break;
-        case '4':
-          if (role == 'admin') {
+            // Logout for admin
             print('Logged out. Goodbye, ${currentUser!['name']}!');
             currentUser = null;
             inMenu = false;
-          } else if (role == 'employer') {
+          }else {
+            // profile for employer
+            editProfile();
+          }
+          break;
+        case '5':
+          if (role == 'employer'){
+            //Logout for employer
             print('Logged out. Goodbye, ${currentUser!['name']}!');
             currentUser = null;
             inMenu = false;
@@ -483,6 +587,8 @@ void browseJobs() {
 }
 
 
+
+
 // ---------- MY APPLICATIONS (Candidate) ----------
 void myApplications() {
   print('\n=== MY APPLICATIONS ===');
@@ -502,6 +608,8 @@ void myApplications() {
     print('No applications yet.');
   }
 }
+
+
 
 
 // ---------- VIEW APPLICANTS (Employer) ----------
@@ -579,6 +687,7 @@ void viewApplicants() {
 
 
 
+
 //----------- Post A job (Employer) ----------
 
 void postJob() {
@@ -632,6 +741,9 @@ void postJob() {
   print('✅ Job posted successfully!');
   saveData();
 }
+
+
+
 
 // ---------- ADMIN DASHBOARD ----------
 void adminDashboard() {
@@ -713,6 +825,9 @@ void adminDashboard() {
 }
 
 
+
+
+
 // ---------- VIEW ALL USERS (Admin) ----------
 void viewAllUsers() {
   print('\n=== ALL REGISTERED USERS ===');
@@ -727,6 +842,10 @@ void viewAllUsers() {
 
   print('\nTotal: ${users.length} users');
 }
+
+
+
+
 
 
 // ---------- VIEW ALL JOBS (Admin) ----------
@@ -747,7 +866,50 @@ void viewAllJobs() {
   }
 
   print('\nTotal: ${jobs.length} jobs');
+
+  // ===== NEW: Admin can delete jobs =====
+  print('\n--- Admin Options ---');
+  print('1. Delete a Job');
+  print('2. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  if (option == '1') {
+    print('Enter job number to delete (or 0 to cancel): ');
+    String? choice = stdin.readLineSync();
+    if (choice == null || choice == '0') return;
+
+    int? selected = int.tryParse(choice);
+    if (selected == null || selected < 1 || selected > jobs.length) {
+      print('Invalid choice!');
+      return;
+    }
+
+    int actualIndex = selected - 1;
+
+    print('Delete "${jobs[actualIndex]['title']}"? (yes/no): ');
+    String? confirm = stdin.readLineSync();
+
+    if (confirm != null && confirm.toLowerCase() == 'yes') {
+      // Remove related applications
+      String jobTitle = jobs[actualIndex]['title']!;
+      String jobCompany = jobs[actualIndex]['company']!;
+
+      applications.removeWhere((app) =>
+          app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
+
+      jobs.removeAt(actualIndex);
+      print('✅ Job deleted by admin!');
+      saveData();
+    } else {
+      print('Deletion cancelled.');
+    }
+  }
 }
+
+
+
 
 
 
@@ -897,4 +1059,39 @@ void deleteJob(List<int> myJobIndexes) {
   } else {
     print('Deletion cancelled.');
   }
+}
+
+
+
+// ---------- EDIT PROFILE ----------
+void editProfile() {
+  print('\n=== EDIT PROFILE ===');
+  print('Leave field blank to keep current value.\n');
+
+  String email = currentUser!['email']!;
+
+  // Edit name
+  print('New Name [${currentUser!['name']}]: ');
+  String? newName = stdin.readLineSync();
+  if (newName != null && newName.isNotEmpty) {
+    users[email]!['name'] = newName;
+    currentUser!['name'] = newName;
+  }
+
+  // Edit password
+  print('New Password (or press Enter to skip): ');
+  String? newPassword = stdin.readLineSync();
+  if (newPassword != null && newPassword.isNotEmpty) {
+    print('Confirm new password: ');
+    String? confirm = stdin.readLineSync();
+    if (newPassword == confirm) {
+      users[email]!['password'] = newPassword;
+      print('✅ Password updated!');
+    } else {
+      print('❌ Passwords do not match!');
+    }
+  }
+
+  print('✅ Profile updated successfully!');
+  saveData();
 }
