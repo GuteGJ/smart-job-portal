@@ -245,6 +245,14 @@ bool login(){
 }
 
 
+
+
+
+
+
+
+
+
 // ------- Show User Menu------------
 
 void showUserMenu(){
@@ -268,15 +276,16 @@ void showUserMenu(){
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
       print('2. View Applications');
-      print('3. Logout');
+      print('3. My Posted Jobs');
+      print('4. Logout');
     }
 
     print('Choose an option: ');
     String? input = stdin.readLineSync();
 
-    switch (input){
+    switch (input) {
       case '1':
-        if (role == 'candidate'){
+        if (role == 'candidate') {
           browseJobs();
         } else if (role == 'admin') {
           adminDashboard();
@@ -284,41 +293,47 @@ void showUserMenu(){
           postJob();
         }
         break;
-      case'2':
-      if (role == 'candidate'){
-        myApplications();
-      }else if (role == 'admin') {
-        viewAllUsers();
-      }else {
-        viewApplicants();
-      }
-      break;
-          case '3':
+      case '2':
         if (role == 'candidate') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
-          currentUser = null;
-          inMenu = false;
+          myApplications();
         } else if (role == 'admin') {
-          viewAllJobs();
+          viewAllUsers();
         } else {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
-          currentUser = null;
-          inMenu = false;
+          viewApplicants();
         }
         break;
-      case '4':
-        if (role == 'admin') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
-          currentUser = null;
-          inMenu = false;
-        }
-        break;
-      default:
-        print('Invalid choice.');
-    }
+        case '3':
+          if (role == 'candidate') {
+            print('Logged out. Goodbye, ${currentUser!['name']}!');
+            currentUser = null;
+            inMenu = false;
+          } else if (role == 'admin') {
+            viewAllJobs();
+          } else {
+            myPostedJobs(); // ← NEW for employer
+          }
+          break;
+        case '4':
+          if (role == 'admin') {
+            print('Logged out. Goodbye, ${currentUser!['name']}!');
+            currentUser = null;
+            inMenu = false;
+          } else if (role == 'employer') {
+            print('Logged out. Goodbye, ${currentUser!['name']}!');
+            currentUser = null;
+            inMenu = false;
+          }
+          break;
+        default:
+          print('Invalid choice.');
+      }
 
   }while (inMenu);
 }
+
+
+
+
 
 // ---------- BROWSE JOBS (Candidate) ----------
 void browseJobs() {
@@ -735,3 +750,151 @@ void viewAllJobs() {
 }
 
 
+
+
+// ---------- MY POSTED JOBS (Employer) ----------
+void myPostedJobs() {
+  print('\n=== MY POSTED JOBS ===');
+
+  // Find jobs posted by current employer
+  List<int> myJobIndexes = [];
+
+  for (int i = 0; i < jobs.length; i++) {
+    if (jobs[i]['postedBy'] == currentUser!['email']) {
+      myJobIndexes.add(i);
+      print('\n${myJobIndexes.length}. ${jobs[i]['title']}');
+      print('   Company: ${jobs[i]['company']}');
+      print('   Location: ${jobs[i]['location']}');
+      print('   Salary: ${jobs[i]['salary']}');
+      print('   Category: ${jobs[i]['category']}');
+    }
+  }
+
+  if (myJobIndexes.isEmpty) {
+    print('You haven\'t posted any jobs yet.');
+    return;
+  }
+
+  print('\n--- Options ---');
+  print('1. Edit a Job');
+  print('2. Delete a Job');
+  print('3. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  switch (option) {
+    case '1':
+      editJob(myJobIndexes);
+      break;
+    case '2':
+      deleteJob(myJobIndexes);
+      break;
+    case '3':
+      return;
+    default:
+      print('Invalid option!');
+  }
+}
+
+
+
+
+
+// ---------- EDIT JOB (Employer) ----------
+void editJob(List<int> myJobIndexes) {
+  print('\n--- Edit Job ---');
+  print('Enter job number to edit (or 0 to cancel): ');
+
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myJobIndexes[selected - 1];
+
+  print('\nLeave field blank to keep current value.\n');
+
+  // Title
+  print('New Title [${jobs[actualIndex]['title']}]: ');
+  String? newTitle = stdin.readLineSync();
+  if (newTitle != null && newTitle.isNotEmpty) {
+    jobs[actualIndex]['title'] = newTitle;
+  }
+
+  // Company
+  print('New Company [${jobs[actualIndex]['company']}]: ');
+  String? newCompany = stdin.readLineSync();
+  if (newCompany != null && newCompany.isNotEmpty) {
+    jobs[actualIndex]['company'] = newCompany;
+  }
+
+  // Location
+  print('New Location [${jobs[actualIndex]['location']}]: ');
+  String? newLocation = stdin.readLineSync();
+  if (newLocation != null && newLocation.isNotEmpty) {
+    jobs[actualIndex]['location'] = newLocation;
+  }
+
+  // Salary
+  print('New Salary [${jobs[actualIndex]['salary']}]: ');
+  String? newSalary = stdin.readLineSync();
+  if (newSalary != null && newSalary.isNotEmpty) {
+    jobs[actualIndex]['salary'] = newSalary;
+  }
+
+  // Category
+  print('New Category [${jobs[actualIndex]['category']}]: ');
+  String? newCategory = stdin.readLineSync();
+  if (newCategory != null && newCategory.isNotEmpty) {
+    jobs[actualIndex]['category'] = newCategory;
+  }
+
+  print('✅ Job updated successfully!');
+  saveData();
+}
+
+
+
+
+// ---------- DELETE JOB (Employer) ----------
+void deleteJob(List<int> myJobIndexes) {
+  print('\n--- Delete Job ---');
+  print('Enter job number to delete (or 0 to cancel): ');
+
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+
+  int? selected = int.tryParse(choice);
+  if (selected == null || selected < 1 || selected > myJobIndexes.length) {
+    print('Invalid choice!');
+    return;
+  }
+
+  int actualIndex = myJobIndexes[selected - 1];
+
+  // Confirm deletion
+  print('Are you sure you want to delete "${jobs[actualIndex]['title']}"? (yes/no): ');
+  String? confirm = stdin.readLineSync();
+
+  if (confirm != null && confirm.toLowerCase() == 'yes') {
+    // Also remove related applications
+    String jobTitle = jobs[actualIndex]['title']!;
+    String jobCompany = jobs[actualIndex]['company']!;
+
+    applications.removeWhere((app) =>
+        app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
+
+    // Remove the job
+    jobs.removeAt(actualIndex);
+
+    print('✅ Job deleted successfully!');
+    saveData();
+  } else {
+    print('Deletion cancelled.');
+  }
+}
