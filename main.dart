@@ -11,6 +11,7 @@ List<String> jobCategories = [];
 Map<String, Map<String, String>> companyProfiles = {};
 List<AppNotification> notifications = [];
 List<Message> messages = [];
+Map<String, Resume> resumes = {};
 
 
 
@@ -348,6 +349,75 @@ class User {
 
 
 
+// ============================================
+// CLASS: Resume
+// ============================================
+class Resume {
+  String email;
+  String fullName;
+  String phone;
+  String address;
+  String summary;
+  List<String> education;
+  List<String> experience;
+  List<String> skills;
+  List<String> languages;
+  DateTime lastUpdated;
+
+  Resume({
+    required this.email,
+    this.fullName = '',
+    this.phone = '',
+    this.address = '',
+    this.summary = '',
+    this.education = const [],
+    this.experience = const [],
+    this.skills = const [],
+    this.languages = const [],
+  }) : lastUpdated = DateTime.now();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'email': email,
+      'fullName': fullName,
+      'phone': phone,
+      'address': address,
+      'summary': summary,
+      'education': education.join('|||'),
+      'experience': experience.join('|||'),
+      'skills': skills.join('|||'),
+      'languages': languages.join('|||'),
+      'lastUpdated': lastUpdated.toIso8601String(),
+    };
+  }
+
+  factory Resume.fromMap(Map<String, dynamic> map) {
+    return Resume(
+      email: map['email']!,
+      fullName: map['fullName'] ?? '',
+      phone: map['phone'] ?? '',
+      address: map['address'] ?? '',
+      summary: map['summary'] ?? '',
+      education: map['education'] != null && map['education']!.isNotEmpty
+          ? (map['education'] as String).split('|||')
+          : [],
+      experience: map['experience'] != null && map['experience']!.isNotEmpty
+          ? (map['experience'] as String).split('|||')
+          : [],
+      skills: map['skills'] != null && map['skills']!.isNotEmpty
+          ? (map['skills'] as String).split('|||')
+          : [],
+      languages: map['languages'] != null && map['languages']!.isNotEmpty
+          ? (map['languages'] as String).split('|||')
+          : [],
+    )..lastUpdated = DateTime.parse(map['lastUpdated'] ?? DateTime.now().toIso8601String());
+  }
+}
+
+
+
+
+
 
 // Pre-load the admin account
 void setupAdmin() {
@@ -378,6 +448,7 @@ void saveData(){
     'companyProfiles': companyProfiles,
     'notifications': notifications.map((n) => n.toMap()).toList(),
     'messages': messages.map((m) => m.toMap()).toList(),
+    'resumes': resumes.map((key, r) => MapEntry(key, r.toMap())),
   };
 
   // Convert to JSON string
@@ -478,6 +549,19 @@ void loadData(){
     messages = List<Message>.from(
       (allData['messages'] as List).map(
         (item) => Message.fromMap(Map<String, dynamic>.from(item as Map)),
+      ),
+    );
+  }
+
+
+  // Profile/Resume
+    if (allData['resumes'] != null) {
+    resumes = Map<String, Resume>.from(
+      (allData['resumes'] as Map).map(
+        (key, value) => MapEntry(
+          key.toString(),
+          Resume.fromMap(Map<String, dynamic>.from(value as Map)),
+        ),
       ),
     );
   }
