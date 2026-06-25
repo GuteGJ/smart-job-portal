@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 
+
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
 List<Map<String, String>> jobs = [];
@@ -8,6 +9,73 @@ List<Map<String, String>> applications = [];
 List<Map<String, String>> bookmarks = [];
 List<String> jobCategories = [];
 Map<String, Map<String, String>> companyProfiles = {};
+List<AppNotification> notifications = [];
+
+
+
+
+
+
+// ============================================
+// CLASS: AppNotification
+// ============================================
+
+class AppNotification {
+  String recipientEmail;
+  String message;
+  String type;
+  DateTime createdAt;
+  bool isRead;
+
+  AppNotification({
+    required this.recipientEmail,
+    required this.message,
+    required this.type,
+  })  : createdAt = DateTime.now(),
+        isRead = false;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'recipientEmail': recipientEmail,
+      'message': message,
+      'type': type,
+      'createdAt': createdAt.toIso8601String(),
+      'isRead': isRead.toString(),
+    };
+  }
+
+  factory AppNotification.fromMap(Map<String, dynamic> map) {
+    return AppNotification(
+      recipientEmail: map['recipientEmail']!,
+      message: map['message']!,
+      type: map['type']!,
+    )
+      ..createdAt = DateTime.parse(map['createdAt']!)
+      ..isRead = map['isRead'] == 'true';
+  }
+
+  String get icon {
+    switch (type) {
+      case 'application': return '📝';
+      case 'status': return '📊';
+      case 'deadline': return '⏰';
+      case 'system': return '🔔';
+      default: return '📌';
+    }
+  }
+
+  String get timeAgo {
+    Duration diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+
+
+
 
 
 
@@ -38,6 +106,7 @@ void saveData(){
     'bookmarks': bookmarks,
     'jobCategories': jobCategories,
     'companyProfiles': companyProfiles,
+    'notifications': notifications.map((n) => n.toMap()).toList(),
   };
 
   // Convert to JSON string
@@ -419,8 +488,9 @@ void showUserMenu(){
       print('2. My Applications');
       print('3. Withdraw Application');
       print('4. My Bookmarks');
-      print('5. Profile');
-      print('6. Logout');
+      print('5. Notifications');
+      print('6. Profile');
+      print('7. Logout');
     }else if (role == 'admin') {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -434,14 +504,15 @@ void showUserMenu(){
       print('2. View Applications');
       print('3. My Posted Jobs');
       print('4. Company Profile');
-      print('5. Profile');
-      print('6. Logout');
+      print('5. Notification');
+      print('6. Profile');
+      print('7. Logout');
     }
 
     print('Choose an option: ');
     String? input = stdin.readLineSync();
 
-    switch (input) {
+      switch (input) {
       case '1':
         if (role == 'candidate') {
           browseJobs();
@@ -472,11 +543,11 @@ void showUserMenu(){
         }
         break;
 
-            case '4':
+      case '4':
         if (role == 'candidate') {
           myBookmarks();
         } else if (role == 'admin') {
-          manageCategories();   // NEW
+          manageCategories();
         } else {
           companyProfile();
         }
@@ -484,17 +555,25 @@ void showUserMenu(){
 
       case '5':
         if (role == 'candidate') {
-          editProfile();
+          viewNotifications();
         } else if (role == 'admin') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
           inMenu = false;
         } else if (role == 'employer') {
-          editProfile();
+          viewNotifications();
         }
         break;
 
       case '6':
+        if (role == 'candidate') {
+          editProfile();
+        } else if (role == 'employer') {
+          editProfile();
+        }
+        break;
+
+      case '7':
         if (role == 'candidate') {
           print('Logged out. Goodbye, ${currentUser!['name']}!');
           currentUser = null;
@@ -738,6 +817,14 @@ void browseJobs() {
   });
 
   print('✅ Applied successfully for ${selectedJob['title']}!');
+
+  //Notify employer
+  addNotification(
+    selectedJob['postedBy']!,
+    '${currentUser!['name']} applied for "${selectedJob['title']}',
+    'application',
+    );
+
   saveData();
 }
 
@@ -941,6 +1028,14 @@ void viewApplicants() {
   }
 
   print('✅ Status updated to: ${applications[actualIndex]['status']}');
+
+  // Notify candidate
+  addNotification(
+    applications[actualIndex]['applicantEmail']!,
+    'Your application for "${applications[actualIndex]['jobTitle']}" is now ${applications[actualIndex]['status']}',
+    'status',
+    );
+
   saveData();
 }
 
@@ -1230,6 +1325,18 @@ void closeJob(List<int> myJobIndexes) {
   if (confirm != null && confirm.toLowerCase() == 'yes') {
     jobs[actualIndex]['status'] = 'Closed';
     print('🔒 Job closed! No more applications accepted.');
+
+    // Notif all aaplicants
+    for (var app in applications) {
+      if (app['jobTitle'] == jobs[actualIndex]['title'] && app['jobCompany'] == jobs[actualIndex]['company']) {
+        addNotification(
+          app['applicantEmail']!,
+          'Job "${jobs[actualIndex]['title']}" has been closed',
+          'system',
+        );
+      }
+    }
+
     saveData();
   } else {
     print('Cancelled.');
@@ -1536,10 +1643,6 @@ void manageCategories() {
 
 
 
-
-
-
-
 // ---------- EDIT PROFILE ----------
 void editProfile() {
   print('\n=== EDIT PROFILE ===');
@@ -1571,4 +1674,76 @@ void editProfile() {
 
   print('✅ Profile updated successfully!');
   saveData();
+}
+
+
+
+
+// ---------- ADD NOTIFICATION ----------
+void addNotification(String email, String message, String type) {
+  notifications.insert(0, AppNotification(
+    recipientEmail: email,
+    message: message,
+    type: type,
+  ));
+  saveData();
+}
+
+
+
+
+
+// ---------- VIEW NOTIFICATIONS ----------
+void viewNotifications() {
+  String email = currentUser!['email']!;
+  
+  print('\n=== NOTIFICATIONS ===');
+  
+  int unreadCount = 0;
+  int totalCount = 0;
+  
+  for (var notif in notifications) {
+    if (notif.recipientEmail == email) {
+      totalCount++;
+      if (!notif.isRead) unreadCount++;
+      
+      String readMark = notif.isRead ? '  ' : '🔵';
+      print('\n$readMark ${notif.icon} ${notif.message}');
+      print('   ${notif.timeAgo}');
+    }
+  }
+  
+  if (totalCount == 0) {
+    print('No notifications yet.');
+    return;
+  }
+  
+  print('\n$unreadCount unread | $totalCount total');
+  
+  print('\n--- Options ---');
+  print('1. Mark All as Read');
+  print('2. Clear All Notifications');
+  print('3. Go Back');
+  print('Choose: ');
+  
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1':
+      for (var notif in notifications) {
+        if (notif.recipientEmail == email) {
+          notif.isRead = true;
+        }
+      }
+      print('✅ All marked as read!');
+      saveData();
+      break;
+    case '2':
+      notifications.removeWhere((n) => n.recipientEmail == email);
+      print('✅ Notifications cleared!');
+      saveData();
+      break;
+    case '3':
+      return;
+  }
 }
