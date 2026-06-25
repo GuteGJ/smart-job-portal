@@ -89,6 +89,7 @@ class Job {
   String postedBy;
   String deadline;
   String status;
+  List<String> requiredSkills;
 
   Job({
     required this.title,
@@ -99,9 +100,10 @@ class Job {
     required this.postedBy,
     this.deadline = 'No deadline',
     this.status = 'Open',
+    this.requiredSkills = const [],
   });
 
-  Map<String, String> toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'title': title,
       'company': company,
@@ -111,10 +113,11 @@ class Job {
       'postedBy': postedBy,
       'deadline': deadline,
       'status': status,
+      'requiredSkills': requiredSkills.join(','),
     };
   }
 
-  factory Job.fromMap(Map<String, String> map) {
+  factory Job.fromMap(Map<String, dynamic> map) {
     return Job(
       title: map['title']!,
       company: map['company']!,
@@ -124,6 +127,9 @@ class Job {
       postedBy: map['postedBy']!,
       deadline: map['deadline'] ?? 'No deadline',
       status: map['status'] ?? 'Open',
+      requiredSkills: map['requiredSkills'] != null && map['requiredSkills']!.isNotEmpty
+        ? (map['requiredSkills'] as String).split(',')
+        : [],
     );
   }
 
@@ -242,6 +248,7 @@ class User {
   String role;
   String securityQuestion;
   String securityAnswer;
+  List<String> skills;
 
   User({
     required this.email,
@@ -250,9 +257,10 @@ class User {
     required this.role,
     required this.securityQuestion,
     required this.securityAnswer,
+    this.skills = const [],
   });
 
-  Map<String, String> toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'email': email,
       'password': password,
@@ -260,10 +268,11 @@ class User {
       'role': role,
       'securityQuestion': securityQuestion,
       'securityAnswer': securityAnswer,
+      'skills': skills.join(','),
     };
   }
 
-  factory User.fromMap(Map<String, String> map) {
+  factory User.fromMap(Map<String, dynamic> map) {
     return User(
       email: map['email']!,
       password: map['password']!,
@@ -271,6 +280,9 @@ class User {
       role: map['role']!,
       securityQuestion: map['securityQuestion'] ?? '',
       securityAnswer: map['securityAnswer'] ?? '',
+      skills: map['skills'] != null && map['skills']!.isNotEmpty
+          ? (map['skills'] as String).split(',')
+          : [],
     );
   }
 
@@ -347,28 +359,28 @@ void loadData(){
   Map<String, dynamic> allData = jsonDecode(jsonString);
 
   // Restore users
-    if (allData['users'] != null) {
+  if (allData['users'] != null) {
     users = Map<String, User>.from(
       (allData['users'] as Map).map(
         (key, value) => MapEntry(
           key.toString(),
-          User.fromMap(Map<String, String>.from(value as Map)),
+          User.fromMap(Map<String, dynamic>.from(value as Map)),
         ),
       ),
     );
   }
 
   //Restore jobs
-  if (allData['jobs'] != null){
+  if (allData['jobs'] != null) {
     jobs = List<Job>.from(
       (allData['jobs'] as List).map(
-        (item) => Job.fromMap(Map<String, String>.from(item as Map)),
+        (item) => Job.fromMap(Map<String, dynamic>.from(item as Map)),
       ),
     );
   }
 
   // Restore applications
-    if (allData['applications'] != null) {
+  if (allData['applications'] != null) {
     applications = List<Application>.from(
       (allData['applications'] as List).map(
         (item) => Application.fromMap(Map<String, String>.from(item as Map)),
@@ -385,7 +397,7 @@ void loadData(){
     );
   }
 
-    // Restore categories
+  // Restore categories
   if (allData['jobCategories'] != null) {
     jobCategories = List<String>.from(allData['jobCategories'] as List);
   }
@@ -402,8 +414,7 @@ void loadData(){
     );
   }
 
-
-  // Notification
+  // Restore notifications
   if (allData['notifications'] != null) {
     notifications = List<AppNotification>.from(
       (allData['notifications'] as List).map(
@@ -414,7 +425,6 @@ void loadData(){
 
   print('Data loaded successfully!');
 }
-
 
 
 
@@ -695,7 +705,6 @@ void forgotPassword() {
 
 
 
-
 // ------- Show User Menu------------
 
 void showUserMenu(){
@@ -705,25 +714,28 @@ void showUserMenu(){
     String role = currentUser!.role;
 
     if(currentUser!.isCandidate){
-      print('\n=== CANDIDATE MANU ===');
+      print('\n=== CANDIDATE MENU ===');
       print('1. Browse Jobs');
-      print('2. My Applications');
-      print('3. Withdraw Application');
-      print('4. My Bookmarks');
-      print('5. Notifications');
-      print('6. Profile');
-      print('7. Logout');
+      print('2. Recommended Jobs');
+      print('3. My Applications');
+      print('4. Withdraw Application');
+      print('5. My Bookmarks');
+      print('6. My Skills');
+      print('7. Notifications');
+      print('8. Profile');
+      print('9. Logout');
     }else if (currentUser!.isAdmin) {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
       print('2. View All Users');
       print('3. View All Jobs');
       print('4. Manage Categories');
-      print('5. Logout');
+      print('5. Reports & Export');
+      print('6. Logout');
     }else if (currentUser!.isEmployer) {
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
-      print('2. View Applications');
+      print('2. View Applicants');
       print('3. My Posted Jobs');
       print('4. Company Profile');
       print('5. Notification');
@@ -734,7 +746,7 @@ void showUserMenu(){
     print('Choose an option: ');
     String? input = stdin.readLineSync();
 
-      switch (input) {
+    switch (input) {
       case '1':
         if (role == 'candidate') {
           browseJobs();
@@ -747,7 +759,7 @@ void showUserMenu(){
 
       case '2':
         if (role == 'candidate') {
-          myApplications();
+          recommendedJobs();
         } else if (role == 'admin') {
           viewAllUsers();
         } else {
@@ -757,7 +769,7 @@ void showUserMenu(){
 
       case '3':
         if (role == 'candidate') {
-          withdrawApplication();
+          myApplications();
         } else if (role == 'admin') {
           viewAllJobs();
         } else {
@@ -767,7 +779,7 @@ void showUserMenu(){
 
       case '4':
         if (role == 'candidate') {
-          myBookmarks();
+          withdrawApplication();
         } else if (role == 'admin') {
           manageCategories();
         } else {
@@ -777,11 +789,9 @@ void showUserMenu(){
 
       case '5':
         if (role == 'candidate') {
-          viewNotifications();
+          myBookmarks();
         } else if (role == 'admin') {
-          print('Logged out. Goodbye, ${currentUser!.name}!');
-          currentUser = null;
-          inMenu = false;
+          adminReports();
         } else if (role == 'employer') {
           viewNotifications();
         }
@@ -789,7 +799,11 @@ void showUserMenu(){
 
       case '6':
         if (role == 'candidate') {
-          editProfile();
+          manageSkills();
+        } else if (role == 'admin') {
+          print('Logged out. Goodbye, ${currentUser!.name}!');
+          currentUser = null;
+          inMenu = false;
         } else if (role == 'employer') {
           editProfile();
         }
@@ -797,10 +811,22 @@ void showUserMenu(){
 
       case '7':
         if (role == 'candidate') {
+          viewNotifications();
+        } else if (role == 'employer') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
-        } else if (role == 'employer') {
+        }
+        break;
+
+      case '8':
+        if (role == 'candidate') {
+          editProfile();
+        }
+        break;
+
+      case '9':
+        if (role == 'candidate') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
@@ -813,6 +839,57 @@ void showUserMenu(){
 
   }while (inMenu);
 }
+
+
+
+
+
+
+// ---------- MANAGE SKILLS (Candidate) ----------
+void manageSkills() {
+  print('\n=== MY SKILLS ===');
+
+  if (currentUser!.skills.isEmpty) {
+    print('No skills added yet.');
+  } else {
+    print('Current skills: ${currentUser!.skills.join(", ")}');
+  }
+
+  print('\n--- Options ---');
+  print('1. Add Skills');
+  print('2. Clear All Skills');
+  print('3. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  switch (option) {
+    case '1':
+      print('Enter skills (comma-separated, e.g., Dart,Flutter,Python): ');
+      String? input = stdin.readLineSync();
+      if (input != null && input.isNotEmpty) {
+        List<String> newSkills = input.split(',').map((s) => s.trim()).toList();
+        for (var skill in newSkills) {
+          if (!currentUser!.skills.contains(skill)) {
+            currentUser!.skills.add(skill);
+          }
+        }
+        users[currentUser!.email]!.skills = currentUser!.skills;
+        print('✅ Skills updated!');
+        saveData();
+      }
+      break;
+    case '2':
+      currentUser!.skills.clear();
+      users[currentUser!.email]!.skills = [];
+      print('✅ Skills cleared!');
+      saveData();
+      break;
+    case '3':
+      return;
+  }
+}
+
 
 
 
@@ -1096,6 +1173,103 @@ void myBookmarks() {
 
 
 
+
+// ---------- RECOMMENDED JOBS (Candidate) ----------
+void recommendedJobs() {
+  print('\n=== RECOMMENDED JOBS FOR YOU ===');
+
+  if (jobs.isEmpty) {
+    print('No jobs available yet.');
+    return;
+  }
+
+  if (currentUser!.skills.isEmpty) {
+    print('⚠️ Add skills to get personalized recommendations!');
+    print('   Go to: My Skills in the menu.');
+    return;
+  }
+
+  List<Map<String, dynamic>> scoredJobs = [];
+
+  for (var job in jobs) {
+    if (job.postedBy == currentUser!.email) continue;
+    if (job.isClosed || job.isExpired) continue;
+
+    // Calculate match score
+    int score = 0;
+    List<String> matchedSkills = [];
+
+    for (var userSkill in currentUser!.skills) {
+      for (var jobSkill in job.requiredSkills) {
+        if (userSkill.toLowerCase() == jobSkill.toLowerCase()) {
+          score += 10;
+          matchedSkills.add(jobSkill);
+        }
+      }
+    }
+
+    // Bonus for same category
+    List<String> preferredCategories = getPreferredCategories();
+    if (preferredCategories.contains(job.category)) {
+      score += 5;
+    }
+
+    if (score > 0) {
+      scoredJobs.add({
+        'job': job,
+        'score': score,
+        'matchedSkills': matchedSkills,
+      });
+    }
+  }
+
+  if (scoredJobs.isEmpty) {
+    print('No matching jobs found. Try adding more skills!');
+    return;
+  }
+
+  // Sort by score (highest first)
+  scoredJobs.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+  // Display top 10
+  int limit = scoredJobs.length > 10 ? 10 : scoredJobs.length;
+  print('Top $limit matches:\n');
+
+  for (int i = 0; i < limit; i++) {
+    Job job = scoredJobs[i]['job'] as Job;
+    int score = scoredJobs[i]['score'] as int;
+    List<String> matched = scoredJobs[i]['matchedSkills'] as List<String>;
+
+    print('${i + 1}. 🔥 ${job.title} (Match: $score%)');
+    print('   Company: ${job.company}');
+    print('   Location: ${job.location}');
+    print('   Category: ${job.category}');
+    print('   Matched Skills: ${matched.join(", ")}');
+    print('');
+  }
+
+  print('Add more skills to improve recommendations!');
+}
+
+// Helper: Get categories candidate has applied to
+List<String> getPreferredCategories() {
+  Set<String> categories = {};
+  for (var app in applications) {
+    if (app.applicantEmail == currentUser!.email) {
+      for (var job in jobs) {
+        if (job.title == app.jobTitle && job.company == app.jobCompany) {
+          categories.add(job.category);
+        }
+      }
+    }
+  }
+  return categories.toList();
+}
+
+
+
+
+
 // ---------- MY APPLICATIONS (Candidate) ----------
 void myApplications() {
   print('\n=== MY APPLICATIONS ===');
@@ -1341,6 +1515,14 @@ void postJob() {
   }
 
 
+    print('Required Skills (comma-separated, e.g., Dart,Flutter,Python): ');
+  String? skillsInput = stdin.readLineSync();
+  List<String> requiredSkills = [];
+  if (skillsInput != null && skillsInput.isNotEmpty) {
+    requiredSkills = skillsInput.split(',').map((s) => s.trim()).toList();
+  }
+
+
 
     // Add job to the list
   jobs.add(Job(
@@ -1352,6 +1534,7 @@ void postJob() {
     postedBy: currentUser!.email,
     deadline: deadline?.toIso8601String() ?? 'No deadline',
     status: 'Open',
+    requiredSkills: requiredSkills,
   ));
 
   print('✅ Job posted successfully!');
@@ -1854,6 +2037,200 @@ void manageCategories() {
 
 
 
+
+
+
+// ---------- ADMIN REPORTS ----------
+void adminReports() {
+  print('\n=== REPORTS & EXPORT ===');
+  print('1. Export All Jobs (CSV)');
+  print('2. Export All Applications (CSV)');
+  print('3. Export All Users (CSV)');
+  print('4. Application Status Report');
+  print('5. Employer Performance Report');
+  print('6. Go Back');
+  print('Choose: ');
+
+  String? option = stdin.readLineSync();
+
+  switch (option) {
+    case '1':
+      exportJobsCSV();
+      break;
+    case '2':
+      exportApplicationsCSV();
+      break;
+    case '3':
+      exportUsersCSV();
+      break;
+    case '4':
+      applicationStatusReport();
+      break;
+    case '5':
+      employerPerformanceReport();
+      break;
+    case '6':
+      return;
+  }
+}
+
+
+
+
+
+
+// ---------- EXPORT JOBS CSV ----------
+void exportJobsCSV() {
+  String csv = 'Title,Company,Location,Salary,Category,Status,Deadline,Posted By\n';
+  
+  for (var job in jobs) {
+    csv += '${job.title},${job.company},${job.location},${job.salary},${job.category},${job.status},${job.deadline},${job.postedBy}\n';
+  }
+
+  File('jobs_export.csv').writeAsStringSync(csv);
+  print('✅ Jobs exported to jobs_export.csv');
+  print('   ${jobs.length} jobs exported!');
+}
+
+
+
+
+// ---------- EXPORT APPLICATIONS CSV ----------
+void exportApplicationsCSV() {
+  String csv = 'Applicant Name,Applicant Email,Job Title,Company,Status,Employer Email\n';
+  
+  for (var app in applications) {
+    csv += '${app.applicantName},${app.applicantEmail},${app.jobTitle},${app.jobCompany},${app.status},${app.employerEmail}\n';
+  }
+
+  File('applications_export.csv').writeAsStringSync(csv);
+  print('✅ Applications exported to applications_export.csv');
+  print('   ${applications.length} applications exported!');
+}
+
+
+
+
+
+// ---------- EXPORT USERS CSV ----------
+void exportUsersCSV() {
+  String csv = 'Name,Email,Role\n';
+  
+  users.forEach((email, user) {
+    csv += '${user.name},$email,${user.role}\n';
+  });
+
+  File('users_export.csv').writeAsStringSync(csv);
+  print('✅ Users exported to users_export.csv');
+  print('   ${users.length} users exported!');
+}
+
+
+
+
+
+// ---------- APPLICATION STATUS REPORT ----------
+void applicationStatusReport() {
+  print('\n=== APPLICATION STATUS REPORT ===\n');
+
+  if (applications.isEmpty) {
+    print('No applications yet.');
+    return;
+  }
+
+  // Count by status
+  Map<String, int> statusCount = {};
+  Map<String, List<String>> statusJobs = {};
+
+  for (var app in applications) {
+    statusCount[app.status] = (statusCount[app.status] ?? 0) + 1;
+    statusJobs.putIfAbsent(app.status, () => []);
+    statusJobs[app.status]!.add('  - ${app.jobTitle} (${app.applicantName})');
+  }
+
+  // Display
+  List<String> statusOrder = ['Applied', 'Under Review', 'Shortlisted', 'Hired', 'Rejected', 'Withdrawn'];
+  
+  for (var status in statusOrder) {
+    if (statusCount.containsKey(status)) {
+      print('${getStatusIcon(status)} $status: ${statusCount[status]}');
+      for (var detail in statusJobs[status]!) {
+        print(detail);
+      }
+      print('');
+    }
+  }
+
+  print('Total Applications: ${applications.length}');
+}
+
+String getStatusIcon(String status) {
+  switch (status) {
+    case 'Applied': return '📝';
+    case 'Under Review': return '🔍';
+    case 'Shortlisted': return '⭐';
+    case 'Rejected': return '❌';
+    case 'Hired': return '🎉';
+    case 'Withdrawn': return '↩️';
+    default: return '📌';
+  }
+}
+
+
+
+
+
+// ---------- EMPLOYER PERFORMANCE REPORT ----------
+void employerPerformanceReport() {
+  print('\n=== EMPLOYER PERFORMANCE REPORT ===\n');
+
+  // Count jobs per employer
+  Map<String, int> employerJobCount = {};
+  Map<String, int> employerAppCount = {};
+  Map<String, String> employerName = {};
+
+  for (var job in jobs) {
+    employerJobCount[job.postedBy] = (employerJobCount[job.postedBy] ?? 0) + 1;
+  }
+
+  for (var app in applications) {
+    employerAppCount[app.employerEmail] = (employerAppCount[app.employerEmail] ?? 0) + 1;
+  }
+
+  // Get employer names
+  for (var job in jobs) {
+    if (users.containsKey(job.postedBy)) {
+      employerName[job.postedBy] = users[job.postedBy]!.name;
+    }
+  }
+
+  if (employerJobCount.isEmpty) {
+    print('No employer data yet.');
+    return;
+  }
+
+  employerJobCount.forEach((email, jobCount) {
+    int appCount = employerAppCount[email] ?? 0;
+    String name = employerName[email] ?? email;
+    double hireRate = appCount > 0 ? (statusCountForEmployer(email, 'Hired') / appCount * 100) : 0;
+    
+    print('🏢 $name ($email)');
+    print('   Jobs Posted: $jobCount');
+    print('   Applications Received: $appCount');
+    print('   Hire Rate: ${hireRate.toStringAsFixed(1)}%');
+    print('');
+  });
+}
+
+int statusCountForEmployer(String email, String status) {
+  int count = 0;
+  for (var app in applications) {
+    if (app.employerEmail == email && app.status == status) {
+      count++;
+    }
+  }
+  return count;
+}
 
 
 
