@@ -4,7 +4,7 @@ import 'dart:convert';
 
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
-List<Map<String, String>> jobs = [];
+List<Job> jobs = [];
 List<Map<String, String>> applications = [];
 List<Map<String, String>> bookmarks = [];
 List<String> jobCategories = [];
@@ -77,6 +77,79 @@ class AppNotification {
 
 
 
+// ============================================
+// CLASS: Job
+// ============================================
+class Job {
+  String title;
+  String company;
+  String location;
+  String salary;
+  String category;
+  String postedBy;
+  String deadline;
+  String status;
+
+  Job({
+    required this.title,
+    required this.company,
+    required this.location,
+    required this.salary,
+    required this.category,
+    required this.postedBy,
+    this.deadline = 'No deadline',
+    this.status = 'Open',
+  });
+
+  Map<String, String> toMap() {
+    return {
+      'title': title,
+      'company': company,
+      'location': location,
+      'salary': salary,
+      'category': category,
+      'postedBy': postedBy,
+      'deadline': deadline,
+      'status': status,
+    };
+  }
+
+  factory Job.fromMap(Map<String, String> map) {
+    return Job(
+      title: map['title']!,
+      company: map['company']!,
+      location: map['location']!,
+      salary: map['salary']!,
+      category: map['category']!,
+      postedBy: map['postedBy']!,
+      deadline: map['deadline'] ?? 'No deadline',
+      status: map['status'] ?? 'Open',
+    );
+  }
+
+  // Helper getters
+  bool get isOpen => status == 'Open';
+  bool get isClosed => status == 'Closed';
+  
+  bool get hasDeadline => deadline != 'No deadline';
+  
+  DateTime? get deadlineDate {
+    if (!hasDeadline) return null;
+    return DateTime.parse(deadline);
+  }
+  
+  bool get isExpired {
+    if (!hasDeadline) return false;
+    return deadlineDate!.isBefore(DateTime.now());
+  }
+
+  @override
+  String toString() => 'Job($title at $company)';
+}
+
+
+
+
 
 
 // Pre-load the admin account
@@ -101,7 +174,7 @@ void saveData(){
   // Put all our data into one big Map
   Map<String, dynamic> allData = {
     'users' : users,
-    'jobs' : jobs,
+    'jobs' : jobs.map((j) => j.toMap()).toList(),
     'applications' : applications,
     'bookmarks': bookmarks,
     'jobCategories': jobCategories,
@@ -150,9 +223,9 @@ void loadData(){
 
   //Restore jobs
   if (allData['jobs'] != null){
-    jobs = List<Map<String, String>>.from(
+    jobs = List<Job>.from(
       (allData['jobs'] as List).map(
-        (item) => Map<String, String>.from(item as Map),
+        (item) => Job.fromMap(Map<String, String>.from(item as Map)),
       ),
     );
   }
@@ -188,6 +261,16 @@ void loadData(){
           key.toString(),
           Map<String, String>.from(value as Map),
         ),
+      ),
+    );
+  }
+
+
+  // Notification
+  if (allData['notifications'] != null) {
+    notifications = List<AppNotification>.from(
+      (allData['notifications'] as List).map(
+        (item) => AppNotification.fromMap(Map<String, dynamic>.from(item as Map)),
       ),
     );
   }
@@ -618,8 +701,8 @@ void browseJobs() {
   // Show available categories
   Set<String> categories = {};
   for (var job in jobs) {
-    if (job['postedBy'] != currentUser!['email']) {
-      categories.add(job['category']!);
+    if (job.postedBy != currentUser!['email']) {
+      categories.add(job.category);
     }
   }
   
@@ -640,8 +723,8 @@ void browseJobs() {
   // Show available locations
   Set<String> locations = {};
   for (var job in jobs) {
-    if (job['postedBy'] != currentUser!['email']) {
-      locations.add(job['location']!);
+    if (job.postedBy!= currentUser!['email']) {
+      locations.add(job.location);
     }
   }
   
@@ -664,53 +747,47 @@ void browseJobs() {
 
   for (int i = 0; i < jobs.length; i++) {
     // Skip own jobs
-    if (jobs[i]['postedBy'] == currentUser!['email']) {
+    if (jobs[i].postedBy == currentUser!['email']) {
       continue;
     }
 
     // Check search keyword
     bool matchesKeyword = keyword == null || keyword.isEmpty ||
-        jobs[i]['title']!.toLowerCase().contains(keyword) ||
-        jobs[i]['company']!.toLowerCase().contains(keyword) ||
-        jobs[i]['category']!.toLowerCase().contains(keyword);
+        jobs[i].title.toLowerCase().contains(keyword) ||
+        jobs[i].company.toLowerCase().contains(keyword) ||
+        jobs[i].category.toLowerCase().contains(keyword);
 
     // Check category filter
     bool matchesCategory = categoryFilter == 'all' ||
-        jobs[i]['category']!.toLowerCase() == categoryFilter.toLowerCase();
+        jobs[i].category.toLowerCase() == categoryFilter.toLowerCase();
 
     // Check location filter
     bool matchesLocation = locationFilter == 'all' ||
-        jobs[i]['location']!.toLowerCase() == locationFilter.toLowerCase();
+        jobs[i].location.toLowerCase() == locationFilter.toLowerCase();
 
     // Show if all filters match
     if (matchesKeyword && matchesCategory && matchesLocation) {
 
       // Skip closed jobs
-      if (jobs[i]['status'] == 'Closed') {
+      if (jobs[i].status == 'Closed') {
         continue;
       }
 
       // Get deadline ONCE
-      String deadlineStr = jobs[i]['deadline'] ?? 'No deadline';
-      
-      // Skip expired jobs (auto-close)
-      if (deadlineStr != 'No deadline') {
-        DateTime deadline = DateTime.parse(deadlineStr);
-        if (deadline.isBefore(DateTime.now())) {
-          continue; // Skip expired jobs
-        }
+      if (jobs[i].isExpired) {
+        continue;
       }
 
       matchingIndexes.add(i);
-      print('\n$displayNumber. ${jobs[i]['title']}');
-      print('   Company: ${jobs[i]['company']}');
-      print('   Location: ${jobs[i]['location']}');
-      print('   Salary: ${jobs[i]['salary']}');
-      print('   Category: ${jobs[i]['category']}');
+      print('\n$displayNumber. ${jobs[i].title}');
+      print('   Company: ${jobs[i].company}');
+      print('   Location: ${jobs[i].location}');
+      print('   Salary: ${jobs[i].salary}');
+      print('   Category: ${jobs[i].category}');
 
-      // Display deadline (reuse the same variable)
-      if (deadlineStr != 'No deadline') {
-        DateTime deadline = DateTime.parse(deadlineStr);
+      // Display deadli
+      if (jobs[i].hasDeadline) {
+        DateTime deadline = jobs[i].deadlineDate!;
         Duration remaining = deadline.difference(DateTime.now());
         if (remaining.inDays > 0) {
           print('   ⏰ Deadline: ${remaining.inDays} days left');
@@ -756,14 +833,14 @@ void browseJobs() {
     }
 
     int actualIndex = matchingIndexes[bookmarkIndex - 1];
-    Map<String, String> selectedJob = jobs[actualIndex];
+    Job selectedJob = jobs[actualIndex];
 
     // Check if already bookmarked
     bool alreadyBookmarked = false;
     for (var bm in bookmarks) {
       if (bm['candidateEmail'] == currentUser!['email'] &&
-          bm['jobTitle'] == selectedJob['title'] &&
-          bm['jobCompany'] == selectedJob['company']) {
+          bm['jobTitle'] == selectedJob.title &&
+          bm['jobCompany'] == selectedJob.company) {
         alreadyBookmarked = true;
         break;
       }
@@ -774,12 +851,12 @@ void browseJobs() {
     } else {
       bookmarks.add({
         'candidateEmail': currentUser!['email']!,
-        'jobTitle': selectedJob['title']!,
-        'jobCompany': selectedJob['company']!,
-        'location': selectedJob['location']!,
-        'category': selectedJob['category']!,
+        'jobTitle': selectedJob.title,
+        'jobCompany': selectedJob.company,
+        'location': selectedJob.location,
+        'category': selectedJob.category,
       });
-      print('🔖 Bookmarked "${selectedJob['title']}"!');
+      print('🔖 Bookmarked "${selectedJob.title}"!');
       saveData();
     }
     return;
@@ -794,13 +871,13 @@ void browseJobs() {
 
   // Get the actual job
   int actualIndex = matchingIndexes[selectedIndex - 1];
-  Map<String, String> selectedJob = jobs[actualIndex];
+  Job selectedJob = jobs[actualIndex];
 
   // Check if already applied
   for (var app in applications) {
     if (app['applicantEmail'] == currentUser!['email'] &&
-        app['jobTitle'] == selectedJob['title'] &&
-        app['jobCompany'] == selectedJob['company']) {
+        app['jobTitle'] == selectedJob.title &&
+        app['jobCompany'] == selectedJob.company) {
       print('You have already applied for this job!');
       return;
     }
@@ -810,18 +887,18 @@ void browseJobs() {
   applications.add({
     'applicantEmail': currentUser!['email']!,
     'applicantName': currentUser!['name']!,
-    'jobTitle': selectedJob['title']!,
-    'jobCompany': selectedJob['company']!,
+    'jobTitle': selectedJob.title,
+    'jobCompany': selectedJob.company,
     'status': 'Applied',
-    'employerEmail': selectedJob['postedBy']!,
+    'employerEmail': selectedJob.postedBy,
   });
 
-  print('✅ Applied successfully for ${selectedJob['title']}!');
+  print('✅ Applied successfully for ${selectedJob.title}!');
 
   //Notify employer
   addNotification(
-    selectedJob['postedBy']!,
-    '${currentUser!['name']} applied for "${selectedJob['title']}',
+    selectedJob.postedBy,
+    '${currentUser!['name']} applied for "${selectedJob.title}',
     'application',
     );
 
@@ -1125,17 +1202,17 @@ void postJob() {
 
 
 
-  // Add job to the list
-  jobs.add({
-    'title': title,
-    'company': company,
-    'location': location,
-    'salary': salary,
-    'category': category,
-    'postedBy': currentUser!['email']!,
-    'deadline': deadline?.toIso8601String() ?? 'No deadline',
-    'status': 'Open',
-  });
+    // Add job to the list
+  jobs.add(Job(
+    title: title,
+    company: company,
+    location: location,
+    salary: salary,
+    category: category,
+    postedBy: currentUser!['email']!,
+    deadline: deadline?.toIso8601String() ?? 'No deadline',
+    status: 'Open',
+  ));
 
   print('✅ Job posted successfully!');
   saveData();
@@ -1161,13 +1238,13 @@ void deleteJob(List<int> myJobIndexes) {
   int actualIndex = myJobIndexes[selected - 1];
 
   // Confirm deletion
-  print('Are you sure you want to delete "${jobs[actualIndex]['title']}"? (yes/no): ');
+  print('Are you sure you want to delete "${jobs[actualIndex].title}"? (yes/no): ');
   String? confirm = stdin.readLineSync();
 
   if (confirm != null && confirm.toLowerCase() == 'yes') {
     // Also remove related applications
-    String jobTitle = jobs[actualIndex]['title']!;
-    String jobCompany = jobs[actualIndex]['company']!;
+    String jobTitle = jobs[actualIndex].title;
+    String jobCompany = jobs[actualIndex].company;
 
     applications.removeWhere((app) =>
         app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
@@ -1193,14 +1270,14 @@ void myPostedJobs() {
   List<int> myJobIndexes = [];
 
   for (int i = 0; i < jobs.length; i++) {
-    if (jobs[i]['postedBy'] == currentUser!['email']) {
+    if (jobs[i].postedBy == currentUser!['email']) {
       myJobIndexes.add(i);
-      print('\n${myJobIndexes.length}. ${jobs[i]['title']}');
-      print('   Company: ${jobs[i]['company']}');
-      print('   Location: ${jobs[i]['location']}');
-      print('   Salary: ${jobs[i]['salary']}');
-      print('   Category: ${jobs[i]['category']}');
-      print('   Status: ${jobs[i]['status'] ?? 'Open'}');
+            print('\n${myJobIndexes.length}. ${jobs[i].title}');
+      print('   Company: ${jobs[i].company}');
+      print('   Location: ${jobs[i].location}');
+      print('   Salary: ${jobs[i].salary}');
+      print('   Category: ${jobs[i].category}');
+      print('   Status: ${jobs[i].status}');
     }
   }
 
@@ -1256,38 +1333,38 @@ void editJob(List<int> myJobIndexes) {
   print('\nLeave field blank to keep current value.\n');
 
   // Title
-  print('New Title [${jobs[actualIndex]['title']}]: ');
+  print('New Title [${jobs[actualIndex].title}]: ');
   String? newTitle = stdin.readLineSync();
   if (newTitle != null && newTitle.isNotEmpty) {
-    jobs[actualIndex]['title'] = newTitle;
+    jobs[actualIndex].title = newTitle;
   }
 
   // Company
-  print('New Company [${jobs[actualIndex]['company']}]: ');
+  print('New Company [${jobs[actualIndex].company}]: ');
   String? newCompany = stdin.readLineSync();
   if (newCompany != null && newCompany.isNotEmpty) {
-    jobs[actualIndex]['company'] = newCompany;
+    jobs[actualIndex].company = newCompany;
   }
 
   // Location
-  print('New Location [${jobs[actualIndex]['location']}]: ');
+  print('New Location [${jobs[actualIndex].location}]: ');
   String? newLocation = stdin.readLineSync();
   if (newLocation != null && newLocation.isNotEmpty) {
-    jobs[actualIndex]['location'] = newLocation;
+    jobs[actualIndex].location = newLocation;
   }
 
   // Salary
-  print('New Salary [${jobs[actualIndex]['salary']}]: ');
+  print('New Salary [${jobs[actualIndex].salary}]: ');
   String? newSalary = stdin.readLineSync();
   if (newSalary != null && newSalary.isNotEmpty) {
-    jobs[actualIndex]['salary'] = newSalary;
+    jobs[actualIndex].salary = newSalary;
   }
 
   // Category
-  print('New Category [${jobs[actualIndex]['category']}]: ');
+  print('New Category [${jobs[actualIndex].category}]: ');
   String? newCategory = stdin.readLineSync();
   if (newCategory != null && newCategory.isNotEmpty) {
-    jobs[actualIndex]['category'] = newCategory;
+    jobs[actualIndex].category = newCategory;
   }
 
   print('✅ Job updated successfully!');
@@ -1314,24 +1391,24 @@ void closeJob(List<int> myJobIndexes) {
 
   int actualIndex = myJobIndexes[selected - 1];
 
-  if (jobs[actualIndex]['status'] == 'Closed') {
+  if (jobs[actualIndex].status == 'Closed') {
     print('Job is already closed!');
     return;
   }
 
-  print('Close "${jobs[actualIndex]['title']}"? (yes/no): ');
+  print('Close "${jobs[actualIndex].title}"? (yes/no): ');
   String? confirm = stdin.readLineSync();
 
   if (confirm != null && confirm.toLowerCase() == 'yes') {
-    jobs[actualIndex]['status'] = 'Closed';
+    jobs[actualIndex].status = 'Closed';
     print('🔒 Job closed! No more applications accepted.');
 
     // Notif all aaplicants
     for (var app in applications) {
-      if (app['jobTitle'] == jobs[actualIndex]['title'] && app['jobCompany'] == jobs[actualIndex]['company']) {
+      if (app['jobTitle'] == jobs[actualIndex].title && app['jobCompany'] == jobs[actualIndex].company) {
         addNotification(
           app['applicantEmail']!,
-          'Job "${jobs[actualIndex]['title']}" has been closed',
+          'Job "${jobs[actualIndex].title}" has been closed',
           'system',
         );
       }
@@ -1455,7 +1532,7 @@ void adminDashboard() {
     Map<String, int> categoryCount = {};
 
     for (var job in jobs) {
-      String category = job['category']!;
+      String category = job.category;
       if (categoryCount.containsKey(category)) {
         categoryCount[category] = categoryCount[category]! + 1;
       } else {
@@ -1533,11 +1610,11 @@ void viewAllJobs() {
   }
 
   for (int i = 0; i < jobs.length; i++) {
-    print('\n${i + 1}. ${jobs[i]['title']}');
-    print('   Company: ${jobs[i]['company']}');
-    print('   Location: ${jobs[i]['location']}');
-    print('   Category: ${jobs[i]['category']}');
-    print('   Posted by: ${jobs[i]['postedBy']}');
+    print('\n${i + 1}. ${jobs[i].title}');
+    print('   Company: ${jobs[i].company}');
+    print('   Location: ${jobs[i].location}');
+    print('   Category: ${jobs[i].category}');
+    print('   Posted by: ${jobs[i].postedBy}');
   }
 
   print('\nTotal: ${jobs.length} jobs');
@@ -1563,13 +1640,13 @@ void viewAllJobs() {
 
     int actualIndex = selected - 1;
 
-    print('Delete "${jobs[actualIndex]['title']}"? (yes/no): ');
+    print('Delete "${jobs[actualIndex].title}"? (yes/no): ');
     String? confirm = stdin.readLineSync();
 
     if (confirm != null && confirm.toLowerCase() == 'yes') {
       // Remove related applications
-      String jobTitle = jobs[actualIndex]['title']!;
-      String jobCompany = jobs[actualIndex]['company']!;
+      String jobTitle = jobs[actualIndex].title;
+      String jobCompany = jobs[actualIndex].company;
 
       applications.removeWhere((app) =>
           app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
