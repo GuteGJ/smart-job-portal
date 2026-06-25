@@ -10,6 +10,7 @@ List<Map<String, String>> bookmarks = [];
 List<String> jobCategories = [];
 Map<String, Map<String, String>> companyProfiles = {};
 List<AppNotification> notifications = [];
+List<Message> messages = [];
 
 
 
@@ -73,6 +74,53 @@ class AppNotification {
   }
 }
 
+
+
+// ============================================
+// CLASS: Message
+// ============================================
+class Message {
+  String fromEmail;
+  String toEmail;
+  String content;
+  DateTime sentAt;
+  bool isRead;
+
+  Message({
+    required this.fromEmail,
+    required this.toEmail,
+    required this.content,
+  })  : sentAt = DateTime.now(),
+        isRead = false;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'fromEmail': fromEmail,
+      'toEmail': toEmail,
+      'content': content,
+      'sentAt': sentAt.toIso8601String(),
+      'isRead': isRead.toString(),
+    };
+  }
+
+  factory Message.fromMap(Map<String, dynamic> map) {
+    return Message(
+      fromEmail: map['fromEmail']!,
+      toEmail: map['toEmail']!,
+      content: map['content']!,
+    )
+      ..sentAt = DateTime.parse(map['sentAt']!)
+      ..isRead = map['isRead'] == 'true';
+  }
+
+  String get timeAgo {
+    Duration diff = DateTime.now().difference(sentAt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
 
 
 
@@ -329,6 +377,7 @@ void saveData(){
     'jobCategories': jobCategories,
     'companyProfiles': companyProfiles,
     'notifications': notifications.map((n) => n.toMap()).toList(),
+    'messages': messages.map((m) => m.toMap()).toList(),
   };
 
   // Convert to JSON string
@@ -419,6 +468,16 @@ void loadData(){
     notifications = List<AppNotification>.from(
       (allData['notifications'] as List).map(
         (item) => AppNotification.fromMap(Map<String, dynamic>.from(item as Map)),
+      ),
+    );
+  }
+
+
+  // Messaging
+  if (allData['messages'] != null) {
+    messages = List<Message>.from(
+      (allData['messages'] as List).map(
+        (item) => Message.fromMap(Map<String, dynamic>.from(item as Map)),
       ),
     );
   }
@@ -717,13 +776,14 @@ void showUserMenu(){
       print('\n=== CANDIDATE MENU ===');
       print('1. Browse Jobs');
       print('2. Recommended Jobs');
-      print('3. My Applications');
-      print('4. Withdraw Application');
-      print('5. My Bookmarks');
-      print('6. My Skills');
-      print('7. Notifications');
-      print('8. Profile');
-      print('9. Logout');
+      print('3. Messages');
+      print('4. My Applications');
+      print('5. Withdraw Application');
+      print('6. My Bookmarks');
+      print('7. My Skills');
+      print('8. Notifications');
+      print('9. Profile');
+      print('10. Logout');
     }else if (currentUser!.isAdmin) {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -736,11 +796,12 @@ void showUserMenu(){
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
       print('2. View Applicants');
-      print('3. My Posted Jobs');
-      print('4. Company Profile');
-      print('5. Notification');
-      print('6. Profile');
-      print('7. Logout');
+      print('3. Messages');
+      print('4. My Posted Jobs');
+      print('5. Company Profile');
+      print('6. Notification');
+      print('7. Profile');
+      print('8. Logout');
     }
 
     print('Choose an option: ');
@@ -769,47 +830,55 @@ void showUserMenu(){
 
       case '3':
         if (role == 'candidate') {
-          myApplications();
+          viewMessages();
         } else if (role == 'admin') {
           viewAllJobs();
         } else {
-          myPostedJobs();
+          viewMessages();
         }
         break;
 
       case '4':
         if (role == 'candidate') {
-          withdrawApplication();
+          myApplications();
         } else if (role == 'admin') {
           manageCategories();
         } else {
-          companyProfile();
+          myPostedJobs();
         }
         break;
 
       case '5':
         if (role == 'candidate') {
-          myBookmarks();
+          withdrawApplication();
         } else if (role == 'admin') {
           adminReports();
         } else if (role == 'employer') {
-          viewNotifications();
+          companyProfile();
         }
         break;
 
       case '6':
         if (role == 'candidate') {
-          manageSkills();
+          myBookmarks();
         } else if (role == 'admin') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
         } else if (role == 'employer') {
-          editProfile();
+          viewNotifications();
         }
         break;
 
       case '7':
+        if (role == 'candidate') {
+          manageSkills();
+        } else if (role == 'employer') {
+          editProfile();
+        }
+        break;
+
+      case '8':
         if (role == 'candidate') {
           viewNotifications();
         } else if (role == 'employer') {
@@ -819,13 +888,13 @@ void showUserMenu(){
         }
         break;
 
-      case '8':
+      case '9':
         if (role == 'candidate') {
           editProfile();
         }
         break;
 
-      case '9':
+      case '10':
         if (role == 'candidate') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
@@ -1396,6 +1465,7 @@ void viewApplicants() {
   print('2. Shortlisted');
   print('3. Rejected');
   print('4. Hired');
+  print('5. Send Message');
   print('Choose new status: ');
 
   String? statusChoice = stdin.readLineSync();
@@ -1413,6 +1483,9 @@ void viewApplicants() {
     case '4':
       applications[actualIndex].status = 'Hired';
       break;
+    case '5':
+      sendMessageTo(applications[actualIndex].applicantEmail);
+      return;
     default:
       print('Invalid status!');
       return;
@@ -2339,5 +2412,130 @@ void viewNotifications() {
       break;
     case '3':
       return;
+  }
+}
+
+
+
+
+// ---------- VIEW MESSAGES ----------
+void viewMessages() {
+  String email = currentUser!.email;
+  
+  print('\n=== MESSAGES ===');
+  
+  // Find unique contacts
+  Set<String> contacts = {};
+  for (var msg in messages) {
+    if (msg.fromEmail == email) contacts.add(msg.toEmail);
+    if (msg.toEmail == email) contacts.add(msg.fromEmail);
+  }
+  
+  if (contacts.isEmpty) {
+    print('No messages yet.');
+    print('\nSend a message to:');
+    print('1. An employer (from applicant list)');
+    print('2. A candidate (from applicants list)');
+    return;
+  }
+  
+  // Show conversations
+  List<String> contactList = contacts.toList();
+  for (int i = 0; i < contactList.length; i++) {
+    String contactEmail = contactList[i];
+    String contactName = users.containsKey(contactEmail) 
+        ? users[contactEmail]!.name 
+        : contactEmail;
+    
+    // Count unread
+    int unread = 0;
+    for (var msg in messages) {
+      if (msg.fromEmail == contactEmail && msg.toEmail == email && !msg.isRead) {
+        unread++;
+      }
+    }
+    
+    String unreadBadge = unread > 0 ? ' ($unread new)' : '';
+    print('${i + 1}. $contactName$unreadBadge');
+  }
+  
+  print('\nEnter number to open conversation (or 0 to go back): ');
+  String? choice = stdin.readLineSync();
+  if (choice == null || choice == '0') return;
+  
+  int? index = int.tryParse(choice);
+  if (index == null || index < 1 || index > contactList.length) {
+    print('Invalid choice!');
+    return;
+  }
+  
+  openConversation(contactList[index - 1]);
+}
+
+// ---------- OPEN CONVERSATION ----------
+void openConversation(String contactEmail) {
+  String myEmail = currentUser!.email;
+  String contactName = users.containsKey(contactEmail) 
+      ? users[contactEmail]!.name 
+      : contactEmail;
+  
+  while (true) {
+    print('\n=== Chat with $contactName ===');
+    
+    // Show messages
+    List<Message> conversation = [];
+    for (var msg in messages) {
+      if ((msg.fromEmail == myEmail && msg.toEmail == contactEmail) ||
+          (msg.fromEmail == contactEmail && msg.toEmail == myEmail)) {
+        conversation.add(msg);
+        msg.isRead = true;
+      }
+    }
+    
+    if (conversation.isEmpty) {
+      print('No messages yet. Start the conversation!');
+    } else {
+      for (var msg in conversation) {
+        String sender = msg.fromEmail == myEmail ? 'You' : contactName;
+        print('[$sender] ${msg.content}');
+        print('  ${msg.timeAgo}');
+      }
+    }
+    
+    print('\nType your message (or 0 to go back): ');
+    String? content = stdin.readLineSync();
+    if (content == null || content == '0') {
+      saveData();
+      return;
+    }
+    
+    if (content.isNotEmpty) {
+      messages.add(Message(
+        fromEmail: myEmail,
+        toEmail: contactEmail,
+        content: content,
+      ));
+      saveData();
+    }
+  }
+}
+
+// ---------- SEND MESSAGE TO USER ----------
+void sendMessageTo(String recipientEmail) {
+  String recipientName = users.containsKey(recipientEmail) 
+      ? users[recipientEmail]!.name 
+      : recipientEmail;
+  
+  print('\nSend message to $recipientName: ');
+  String? content = stdin.readLineSync();
+  
+  if (content != null && content.isNotEmpty) {
+    messages.add(Message(
+      fromEmail: currentUser!.email,
+      toEmail: recipientEmail,
+      content: content,
+    ));
+    print('✅ Message sent!');
+    saveData();
   }
 }
