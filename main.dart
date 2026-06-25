@@ -5,7 +5,7 @@ import 'dart:convert';
 Map<String, Map<String, String>> users = {};
 Map<String, String>? currentUser = null;
 List<Job> jobs = [];
-List<Map<String, String>> applications = [];
+List<Application> applications = [];
 List<Map<String, String>> bookmarks = [];
 List<String> jobCategories = [];
 Map<String, Map<String, String>> companyProfiles = {};
@@ -151,6 +151,87 @@ class Job {
 
 
 
+// ============================================
+// CLASS: Application
+// ============================================
+class Application {
+  String applicantEmail;
+  String applicantName;
+  String jobTitle;
+  String jobCompany;
+  String status;
+  String employerEmail;
+  DateTime appliedAt;
+
+  Application({
+    required this.applicantEmail,
+    required this.applicantName,
+    required this.jobTitle,
+    required this.jobCompany,
+    this.status = 'Applied',
+    required this.employerEmail,
+  }) : appliedAt = DateTime.now();
+
+  // For loading from file (preserves original date)
+  Application.withDate({
+    required this.applicantEmail,
+    required this.applicantName,
+    required this.jobTitle,
+    required this.jobCompany,
+    required this.status,
+    required this.employerEmail,
+    required this.appliedAt,
+  });
+
+  Map<String, String> toMap() {
+    return {
+      'applicantEmail': applicantEmail,
+      'applicantName': applicantName,
+      'jobTitle': jobTitle,
+      'jobCompany': jobCompany,
+      'status': status,
+      'employerEmail': employerEmail,
+      'appliedAt': appliedAt.toIso8601String(),
+    };
+  }
+
+  factory Application.fromMap(Map<String, String> map) {
+    return Application.withDate(
+      applicantEmail: map['applicantEmail']!,
+      applicantName: map['applicantName']!,
+      jobTitle: map['jobTitle']!,
+      jobCompany: map['jobCompany']!,
+      status: map['status']!,
+      employerEmail: map['employerEmail']!,
+      appliedAt: DateTime.parse(map['appliedAt'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+
+  // Getters
+  bool get canWithdraw => status == 'Applied' || status == 'Under Review';
+  bool get isActive => status != 'Withdrawn' && status != 'Rejected';
+
+  String get statusIcon {
+    switch (status) {
+      case 'Applied': return '📝';
+      case 'Under Review': return '🔍';
+      case 'Shortlisted': return '⭐';
+      case 'Rejected': return '❌';
+      case 'Hired': return '🎉';
+      case 'Withdrawn': return '↩️';
+      default: return '📌';
+    }
+  }
+
+  @override
+  String toString() => 'Application($applicantName -> $jobTitle: $status)';
+}
+
+
+
+
+
+
 
 // Pre-load the admin account
 void setupAdmin() {
@@ -175,7 +256,7 @@ void saveData(){
   Map<String, dynamic> allData = {
     'users' : users,
     'jobs' : jobs.map((j) => j.toMap()).toList(),
-    'applications' : applications,
+    'applications': applications.map((a) => a.toMap()).toList(),
     'bookmarks': bookmarks,
     'jobCategories': jobCategories,
     'companyProfiles': companyProfiles,
@@ -231,10 +312,10 @@ void loadData(){
   }
 
   // Restore applications
-  if (allData['applications'] != null){
-    applications = List<Map<String, String>>.from(
+    if (allData['applications'] != null) {
+    applications = List<Application>.from(
       (allData['applications'] as List).map(
-        (item) => Map<String, String>.from(item as Map),
+        (item) => Application.fromMap(Map<String, String>.from(item as Map)),
       ),
     );
   }
@@ -875,23 +956,23 @@ void browseJobs() {
 
   // Check if already applied
   for (var app in applications) {
-    if (app['applicantEmail'] == currentUser!['email'] &&
-        app['jobTitle'] == selectedJob.title &&
-        app['jobCompany'] == selectedJob.company) {
+    if (app.applicantEmail == currentUser!['email'] &&
+        app.jobTitle == selectedJob.title &&
+        app.jobCompany == selectedJob.company) {
       print('You have already applied for this job!');
       return;
     }
   }
 
   // Apply
-  applications.add({
-    'applicantEmail': currentUser!['email']!,
-    'applicantName': currentUser!['name']!,
-    'jobTitle': selectedJob.title,
-    'jobCompany': selectedJob.company,
-    'status': 'Applied',
-    'employerEmail': selectedJob.postedBy,
-  });
+  applications.add(Application(
+    applicantEmail: currentUser!['email']!,
+    applicantName: currentUser!['name']!,
+    jobTitle: selectedJob.title,
+    jobCompany: selectedJob.company,
+    status: 'Applied',
+    employerEmail: selectedJob.postedBy,
+  ));
 
   print('✅ Applied successfully for ${selectedJob.title}!');
 
@@ -964,11 +1045,11 @@ void myApplications() {
   bool found = false;
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i]['applicantEmail'] == currentUser!['email']) {
+    if (applications[i].applicantEmail == currentUser!['email']) {
       found = true;
-      print('\n${i + 1}. ${applications[i]['jobTitle']}');
-      print('   Company: ${applications[i]['jobCompany']}');
-      print('   Status: ${applications[i]['status']}');
+      print('\n${i + 1}. ${applications[i].statusIcon} ${applications[i].jobTitle}');
+      print('   Company: ${applications[i].jobCompany}');
+      print('   Status: ${applications[i].status}');
     }
   }
 
@@ -976,6 +1057,8 @@ void myApplications() {
     print('No applications yet.');
   }
 }
+
+
 
 
 
@@ -987,11 +1070,11 @@ void withdrawApplication() {
   List<int> myAppIndexes = [];
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i]['applicantEmail'] == currentUser!['email']) {
+    if (applications[i].applicantEmail == currentUser!['email']) {
       myAppIndexes.add(i);
-      print('\n${myAppIndexes.length}. ${applications[i]['jobTitle']}');
-      print('   Company: ${applications[i]['jobCompany']}');
-      print('   Status: ${applications[i]['status']}');
+      print('\n${myAppIndexes.length}. ${applications[i].jobTitle}');
+      print('   Company: ${applications[i].jobCompany}');
+      print('   Status: ${applications[i].status}');
     }
   }
 
@@ -1013,17 +1096,16 @@ void withdrawApplication() {
   int actualIndex = myAppIndexes[selected - 1];
 
   // Can only withdraw if status is 'Applied' or 'Under Review'
-  String status = applications[actualIndex]['status']!;
-  if (status != 'Applied' && status != 'Under Review') {
-    print('Cannot withdraw! Status is: $status');
+    if (!applications[actualIndex].canWithdraw) {
+    print('Cannot withdraw! Status is: ${applications[actualIndex].status}');
     return;
   }
 
-  print('Withdraw application for "${applications[actualIndex]['jobTitle']}"? (yes/no): ');
+  print('Withdraw application for "${applications[actualIndex].jobTitle}"? (yes/no): ');
   String? confirm = stdin.readLineSync();
 
   if (confirm != null && confirm.toLowerCase() == 'yes') {
-    applications[actualIndex]['status'] = 'Withdrawn';
+    applications[actualIndex].status = 'Withdrawn';
     print('✅ Application withdrawn!');
     saveData();
   } else {
@@ -1042,11 +1124,11 @@ void viewApplicants() {
   bool found = false;
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i]['employerEmail'] == currentUser!['email']) {
+    if (applications[i].employerEmail == currentUser!['email']) {
       found = true;
-      print('\n${i + 1}. ${applications[i]['applicantName']}');
-      print('   Applied for: ${applications[i]['jobTitle']}');
-      print('   Status: ${applications[i]['status']}');
+      print('\n${i + 1}. ${applications[i].applicantName}');
+      print('   Applied for: ${applications[i].jobTitle}');
+      print('   Status: ${applications[i].status}');
     }
   }
 
@@ -1072,7 +1154,7 @@ void viewApplicants() {
   int actualIndex = appIndex - 1;
 
   // Check if this application belongs to this employer
-  if (applications[actualIndex]['employerEmail'] != currentUser!['email']) {
+  if (applications[actualIndex].employerEmail != currentUser!['email']) {
     print('Invalid choice!');
     return;
   }
@@ -1088,28 +1170,28 @@ void viewApplicants() {
 
   switch (statusChoice) {
     case '1':
-      applications[actualIndex]['status'] = 'Under Review';
+      applications[actualIndex].status = 'Under Review';
       break;
     case '2':
-      applications[actualIndex]['status'] = 'Shortlisted';
+      applications[actualIndex].status = 'Shortlisted';
       break;
     case '3':
-      applications[actualIndex]['status'] = 'Rejected';
+      applications[actualIndex].status = 'Rejected';
       break;
     case '4':
-      applications[actualIndex]['status'] = 'Hired';
+      applications[actualIndex].status = 'Hired';
       break;
     default:
       print('Invalid status!');
       return;
   }
 
-  print('✅ Status updated to: ${applications[actualIndex]['status']}');
+  print('✅ Status updated to: ${applications[actualIndex].status}');
 
   // Notify candidate
   addNotification(
-    applications[actualIndex]['applicantEmail']!,
-    'Your application for "${applications[actualIndex]['jobTitle']}" is now ${applications[actualIndex]['status']}',
+    applications[actualIndex].applicantEmail,
+    'Your application for "${applications[actualIndex].jobTitle}" is now ${applications[actualIndex].status}',
     'status',
     );
 
@@ -1247,7 +1329,7 @@ void deleteJob(List<int> myJobIndexes) {
     String jobCompany = jobs[actualIndex].company;
 
     applications.removeWhere((app) =>
-        app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
+        app.jobTitle == jobTitle && app.jobCompany == jobCompany);
 
     // Remove the job
     jobs.removeAt(actualIndex);
@@ -1405,9 +1487,9 @@ void closeJob(List<int> myJobIndexes) {
 
     // Notif all aaplicants
     for (var app in applications) {
-      if (app['jobTitle'] == jobs[actualIndex].title && app['jobCompany'] == jobs[actualIndex].company) {
+      if (app.jobTitle == jobs[actualIndex].title && app.jobCompany == jobs[actualIndex].company) {
         addNotification(
-          app['applicantEmail']!,
+          app.applicantEmail,
           'Job "${jobs[actualIndex].title}" has been closed',
           'system',
         );
@@ -1559,7 +1641,7 @@ void adminDashboard() {
     Map<String, int> statusCount = {};
 
     for (var app in applications) {
-      String status = app['status']!;
+      String status = app.status;
       if (statusCount.containsKey(status)) {
         statusCount[status] = statusCount[status]! + 1;
       } else {
@@ -1649,7 +1731,7 @@ void viewAllJobs() {
       String jobCompany = jobs[actualIndex].company;
 
       applications.removeWhere((app) =>
-          app['jobTitle'] == jobTitle && app['jobCompany'] == jobCompany);
+          app.jobTitle == jobTitle && app.jobCompany == jobCompany);
 
       jobs.removeAt(actualIndex);
       print('✅ Job deleted by admin!');
