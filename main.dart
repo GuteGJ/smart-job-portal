@@ -858,6 +858,7 @@ void showUserMenu(){
 
     if(currentUser!.isCandidate){
       print('\n=== CANDIDATE MENU ===');
+      showDeadlineAlerts();
       print('1. Browse Jobs');
       print('2. Recommended Jobs');
       print('3. Messages');
@@ -865,9 +866,10 @@ void showUserMenu(){
       print('5. Withdraw Application');
       print('6. My Bookmarks');
       print('7. My Skills');
-      print('8. Notifications');
-      print('9. Profile');
-      print('10. Logout');
+      print('8. My Resume');
+      print('9. Notifications');
+      print('10. Profile');
+      print('11. Logout');
     }else if (currentUser!.isAdmin) {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
@@ -964,6 +966,14 @@ void showUserMenu(){
 
       case '8':
         if (role == 'candidate') {
+          myResume();
+        } else if (role == 'employer') {
+          editProfile();
+        }
+        break;
+
+      case '9':
+        if (role == 'candidate') {
           viewNotifications();
         } else if (role == 'employer') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
@@ -972,13 +982,13 @@ void showUserMenu(){
         }
         break;
 
-      case '9':
+      case '10':
         if (role == 'candidate') {
           editProfile();
         }
         break;
 
-      case '10':
+      case '11':
         if (role == 'candidate') {
           print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
@@ -1042,6 +1052,329 @@ void manageSkills() {
       return;
   }
 }
+
+
+
+
+
+
+
+// ---------- MY RESUME (Candidate) ----------
+void myResume() {
+  String email = currentUser!.email;
+  
+  if (!resumes.containsKey(email)) {
+    resumes[email] = Resume(email: email);
+  }
+  
+  Resume resume = resumes[email]!;
+  
+  print('\n╔══════════════════════════════════╗');
+  print('║        📄 MY RESUME              ║');
+  print('╚══════════════════════════════════╝');
+  
+  print('\n👤 Personal Information');
+  print('   Name: ${resume.fullName.isNotEmpty ? resume.fullName : "(not set)"}');
+  print('   Phone: ${resume.phone.isNotEmpty ? resume.phone : "(not set)"}');
+  print('   Address: ${resume.address.isNotEmpty ? resume.address : "(not set)"}');
+  
+  print('\n📝 Summary');
+  print('   ${resume.summary.isNotEmpty ? resume.summary : "(not set)"}');
+  
+  print('\n🎓 Education');
+  if (resume.education.isEmpty) {
+    print('   (none added)');
+  } else {
+    for (var edu in resume.education) {
+      print('   • $edu');
+    }
+  }
+  
+  print('\n💼 Experience');
+  if (resume.experience.isEmpty) {
+    print('   (none added)');
+  } else {
+    for (var exp in resume.experience) {
+      print('   • $exp');
+    }
+  }
+  
+  print('\n🛠️ Skills');
+  if (resume.skills.isEmpty) {
+    print('   (none added)');
+  } else {
+    print('   ${resume.skills.join(", ")}');
+  }
+  
+  print('\n🗣️ Languages');
+  if (resume.languages.isEmpty) {
+    print('   (none added)');
+  } else {
+    print('   ${resume.languages.join(", ")}');
+  }
+  
+  print('\n--- Options ---');
+  print('1. Edit Personal Info');
+  print('2. Edit Summary');
+  print('3. Add Education');
+  print('4. Add Experience');
+  print('5. Add Skills');
+  print('6. Add Languages');
+  print('7. Export Resume (Text File)');
+  print('8. Go Back');
+  print('Choose: ');
+  
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1': editPersonalInfo(resume); break;
+    case '2': editSummary(resume); break;
+    case '3': addEducation(resume); break;
+    case '4': addExperience(resume); break;
+    case '5': addSkillsToResume(resume); break;
+    case '6': addLanguages(resume); break;
+    case '7': exportResume(resume); break;
+    case '8': return;
+    default: print('Invalid option!');
+  }
+}
+
+// ---------- EDIT PERSONAL INFO ----------
+void editPersonalInfo(Resume resume) {
+  print('\n--- Edit Personal Info ---');
+  print('Leave blank to keep current.\n');
+  
+  print('Full Name [${resume.fullName}]: ');
+  String? name = stdin.readLineSync();
+  if (name != null && name.isNotEmpty) resume.fullName = name;
+  
+  print('Phone [${resume.phone}]: ');
+  String? phone = stdin.readLineSync();
+  if (phone != null && phone.isNotEmpty) resume.phone = phone;
+  
+  print('Address [${resume.address}]: ');
+  String? address = stdin.readLineSync();
+  if (address != null && address.isNotEmpty) resume.address = address;
+  
+  resume.lastUpdated = DateTime.now();
+  saveData();
+  print('✅ Personal info updated!');
+}
+
+// ---------- EDIT SUMMARY ----------
+void editSummary(Resume resume) {
+  print('\n--- Edit Summary ---');
+  print('Current: ${resume.summary.isNotEmpty ? resume.summary : "(none)"}');
+  print('Enter new summary: ');
+  String? summary = stdin.readLineSync();
+  if (summary != null && summary.isNotEmpty) {
+    resume.summary = summary;
+    resume.lastUpdated = DateTime.now();
+    saveData();
+    print('✅ Summary updated!');
+  }
+}
+
+// ---------- ADD EDUCATION ----------
+void addEducation(Resume resume) {
+  print('\n--- Education ---');
+  if (resume.education.isNotEmpty) {
+    print('Current:');
+    for (int i = 0; i < resume.education.length; i++) {
+      print('  ${i + 1}. ${resume.education[i]}');
+    }
+  }
+  
+  print('\nOptions: 1. Add  2. Remove  3. Back');
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1':
+      print('Enter education (e.g., BSc Computer Science, AAU, 2023): ');
+      String? edu = stdin.readLineSync();
+      if (edu != null && edu.isNotEmpty) {
+        resume.education.add(edu);
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Education added!');
+      }
+      break;
+    case '2':
+      if (resume.education.isEmpty) {
+        print('Nothing to remove.');
+        return;
+      }
+      print('Enter number to remove: ');
+      String? num = stdin.readLineSync();
+      int? index = int.tryParse(num ?? '');
+      if (index != null && index >= 1 && index <= resume.education.length) {
+        resume.education.removeAt(index - 1);
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Removed!');
+      }
+      break;
+    case '3':
+      return;
+  }
+}
+
+// ---------- ADD EXPERIENCE ----------
+void addExperience(Resume resume) {
+  print('\n--- Experience ---');
+  if (resume.experience.isNotEmpty) {
+    print('Current:');
+    for (int i = 0; i < resume.experience.length; i++) {
+      print('  ${i + 1}. ${resume.experience[i]}');
+    }
+  }
+  
+  print('\nOptions: 1. Add  2. Remove  3. Back');
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1':
+      print('Enter experience (e.g., Flutter Developer, TechCo, 2023-Present): ');
+      String? exp = stdin.readLineSync();
+      if (exp != null && exp.isNotEmpty) {
+        resume.experience.add(exp);
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Experience added!');
+      }
+      break;
+    case '2':
+      if (resume.experience.isEmpty) {
+        print('Nothing to remove.');
+        return;
+      }
+      print('Enter number to remove: ');
+      String? num = stdin.readLineSync();
+      int? index = int.tryParse(num ?? '');
+      if (index != null && index >= 1 && index <= resume.experience.length) {
+        resume.experience.removeAt(index - 1);
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Removed!');
+      }
+      break;
+    case '3':
+      return;
+  }
+}
+
+// ---------- ADD SKILLS TO RESUME ----------
+void addSkillsToResume(Resume resume) {
+  print('\n--- Resume Skills ---');
+  if (resume.skills.isNotEmpty) {
+    print('Current: ${resume.skills.join(", ")}');
+  }
+  
+  print('\nOptions: 1. Add  2. Remove All  3. Back');
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1':
+      print('Enter skills (comma-separated): ');
+      String? input = stdin.readLineSync();
+      if (input != null && input.isNotEmpty) {
+        List<String> newSkills = input.split(',').map((s) => s.trim()).toList();
+        for (var skill in newSkills) {
+          if (!resume.skills.contains(skill)) {
+            resume.skills.add(skill);
+          }
+        }
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Skills updated!');
+      }
+      break;
+    case '2':
+      resume.skills.clear();
+      resume.lastUpdated = DateTime.now();
+      saveData();
+      print('✅ Skills cleared!');
+      break;
+    case '3':
+      return;
+  }
+}
+
+// ---------- ADD LANGUAGES ----------
+void addLanguages(Resume resume) {
+  print('\n--- Languages ---');
+  if (resume.languages.isNotEmpty) {
+    print('Current: ${resume.languages.join(", ")}');
+  }
+  
+  print('\nOptions: 1. Add  2. Remove All  3. Back');
+  String? option = stdin.readLineSync();
+  
+  switch (option) {
+    case '1':
+      print('Enter languages (comma-separated, e.g., English, Amharic): ');
+      String? input = stdin.readLineSync();
+      if (input != null && input.isNotEmpty) {
+        List<String> newLangs = input.split(',').map((s) => s.trim()).toList();
+        for (var lang in newLangs) {
+          if (!resume.languages.contains(lang)) {
+            resume.languages.add(lang);
+          }
+        }
+        resume.lastUpdated = DateTime.now();
+        saveData();
+        print('✅ Languages updated!');
+      }
+      break;
+    case '2':
+      resume.languages.clear();
+      resume.lastUpdated = DateTime.now();
+      saveData();
+      print('✅ Languages cleared!');
+      break;
+    case '3':
+      return;
+  }
+}
+
+// ---------- EXPORT RESUME ----------
+void exportResume(Resume resume) {
+  String text = '''
+========================================
+           PROFESSIONAL RESUME
+========================================
+
+👤 PERSONAL INFORMATION
+   Name: ${resume.fullName}
+   Email: ${resume.email}
+   Phone: ${resume.phone}
+   Address: ${resume.address}
+
+📝 PROFESSIONAL SUMMARY
+   ${resume.summary}
+
+🎓 EDUCATION
+${resume.education.map((e) => '   • $e').join('\n')}
+
+💼 WORK EXPERIENCE
+${resume.experience.map((e) => '   • $e').join('\n')}
+
+🛠️ SKILLS
+   ${resume.skills.join(', ')}
+
+🗣️ LANGUAGES
+   ${resume.languages.join(', ')}
+
+========================================
+Last Updated: ${resume.lastUpdated.toString().substring(0, 10)}
+========================================
+''';
+
+  File('${resume.fullName}_Resume.txt'.replaceAll(' ', '_')).writeAsStringSync(text);
+  print('✅ Resume exported to file!');
+}
+
+
 
 
 
@@ -1159,7 +1492,11 @@ void browseJobs() {
         DateTime deadline = jobs[i].deadlineDate!;
         Duration remaining = deadline.difference(DateTime.now());
         if (remaining.inDays > 0) {
-          print('   ⏰ Deadline: ${remaining.inDays} days left');
+          if (remaining.inDays <= 3 && remaining.inDays > 0) {
+            print('   ⚡ URGENT: ${remaining.inDays} days left!');
+          } else {
+            print('   ⏰ Deadline: ${remaining.inDays} days left');
+          }
         } else if (remaining.inDays == 0) {
           print('   ⚠️ Deadline: TODAY!');
         } else {
@@ -1290,6 +1627,19 @@ void myBookmarks() {
       print('   Company: ${bookmarks[i]['jobCompany']}');
       print('   Location: ${bookmarks[i]['location']}');
       print('   Category: ${bookmarks[i]['category']}');
+
+      // NEW: Show deadline if found
+      for (var job in jobs) {
+        if (job.title == bookmarks[i]['jobTitle'] && 
+            job.company == bookmarks[i]['jobCompany'] &&
+            job.hasDeadline && !job.isExpired) {
+          DateTime deadline = job.deadlineDate!;
+          Duration remaining = deadline.difference(DateTime.now());
+          if (remaining.inDays <= 3) {
+            print('   ⚡ ${remaining.inDays} day(s) left!');
+          }
+        }
+      }
     }
   }
 
@@ -2439,6 +2789,70 @@ void addNotification(String email, String message, String type) {
   ));
   saveData();
 }
+
+
+
+
+
+
+
+// ---------- SHOW DEADLINE ALERTS ----------
+void showDeadlineAlerts() {
+  if (currentUser == null || !currentUser!.isCandidate) return;
+  
+  List<String> alerts = [];
+  
+  for (var job in jobs) {
+    if (job.isClosed || job.isExpired) continue;
+    if (!job.hasDeadline) continue;
+    
+    // Check if candidate applied to this job
+    bool hasApplied = false;
+    for (var app in applications) {
+      if (app.applicantEmail == currentUser!.email &&
+          app.jobTitle == job.title &&
+          app.jobCompany == job.company) {
+        hasApplied = true;
+        break;
+      }
+    }
+    
+    // Check if bookmarked
+    bool isBookmarked = false;
+    for (var bm in bookmarks) {
+      if (bm['candidateEmail'] == currentUser!.email &&
+          bm['jobTitle'] == job.title &&
+          bm['jobCompany'] == job.company) {
+        isBookmarked = true;
+        break;
+      }
+    }
+    
+    // Alert for applied or bookmarked jobs
+    if (hasApplied || isBookmarked) {
+      DateTime deadline = job.deadlineDate!;
+      Duration remaining = deadline.difference(DateTime.now());
+      
+      if (remaining.inDays <= 3 && remaining.inDays > 0) {
+        alerts.add('⏰ ${job.title} at ${job.company}: ${remaining.inDays} day(s) left!');
+      } else if (remaining.inDays == 0 && remaining.inHours > 0) {
+        alerts.add('⚠️ ${job.title} at ${job.company}: Deadline TODAY!');
+      }
+    }
+  }
+  
+  if (alerts.isNotEmpty) {
+    print('\n═══════════════════════════════════');
+    print('📅 DEADLINE ALERTS');
+    for (var alert in alerts) {
+      print('   $alert');
+    }
+    print('═══════════════════════════════════');
+  }
+}
+
+
+
 
 
 
