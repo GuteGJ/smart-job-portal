@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:convert';
 
 
-Map<String, Map<String, String>> users = {};
-Map<String, String>? currentUser = null;
+Map<String, User> users = {};
+User? currentUser = null;
 List<Job> jobs = [];
 List<Application> applications = [];
 List<Map<String, String>> bookmarks = [];
@@ -232,18 +232,74 @@ class Application {
 
 
 
+// ============================================
+// CLASS: User
+// ============================================
+class User {
+  String email;
+  String password;
+  String name;
+  String role;
+  String securityQuestion;
+  String securityAnswer;
+
+  User({
+    required this.email,
+    required this.password,
+    required this.name,
+    required this.role,
+    required this.securityQuestion,
+    required this.securityAnswer,
+  });
+
+  Map<String, String> toMap() {
+    return {
+      'email': email,
+      'password': password,
+      'name': name,
+      'role': role,
+      'securityQuestion': securityQuestion,
+      'securityAnswer': securityAnswer,
+    };
+  }
+
+  factory User.fromMap(Map<String, String> map) {
+    return User(
+      email: map['email']!,
+      password: map['password']!,
+      name: map['name']!,
+      role: map['role']!,
+      securityQuestion: map['securityQuestion'] ?? '',
+      securityAnswer: map['securityAnswer'] ?? '',
+    );
+  }
+
+  // Getters
+  bool get isCandidate => role == 'candidate';
+  bool get isEmployer => role == 'employer';
+  bool get isAdmin => role == 'admin';
+
+  @override
+  String toString() => 'User($name, $email, $role)';
+}
+
+
+
+
+
+
 
 // Pre-load the admin account
 void setupAdmin() {
-  if (!users.containsKey('admin@jobportal.com')){
-    users['admin@jobportal.com'] = {
-      'password': 'admin123',
-      'name': 'System Admin',
-      'role': 'admin',
-      'securityQuestion': 'What is the admin password?',
-      'securityAnswer': 'admin123',
-    };
-
+  if (!users.containsKey('admin@jobportal.com')) {
+    users['admin@jobportal.com'] = User(
+      email: 'admin@jobportal.com',
+      password: 'admin123',
+      name: 'System Admin',
+      role: 'admin',
+      securityQuestion: 'What is the admin password?',
+      securityAnswer: 'admin123',
+    );
   }
 }
 
@@ -254,7 +310,7 @@ void setupAdmin() {
 void saveData(){
   // Put all our data into one big Map
   Map<String, dynamic> allData = {
-    'users' : users,
+    'users': users.map((key, u) => MapEntry(key, u.toMap())),
     'jobs' : jobs.map((j) => j.toMap()).toList(),
     'applications': applications.map((a) => a.toMap()).toList(),
     'bookmarks': bookmarks,
@@ -291,12 +347,12 @@ void loadData(){
   Map<String, dynamic> allData = jsonDecode(jsonString);
 
   // Restore users
-  if (allData['users']!=null) {
-    users = Map<String, Map<String, String>>.from(
+    if (allData['users'] != null) {
+    users = Map<String, User>.from(
       (allData['users'] as Map).map(
         (key, value) => MapEntry(
           key.toString(),
-          Map<String, String>.from(value as Map),
+          User.fromMap(Map<String, String>.from(value as Map)),
         ),
       ),
     );
@@ -500,13 +556,14 @@ void register(){
   // ===== END NEW =====
 
   // Add user to the map
-  users[email] = {
-    'password': password,
-    'name': name,
-    'role': role,
-    'securityQuestion': securityQuestion,   // NEW
-    'securityAnswer': securityAnswer.toLowerCase(), // NEW
-  };
+    users[email] = User(
+    email: email,
+    password: password,
+    name: name,
+    role: role,
+    securityQuestion: securityQuestion,
+    securityAnswer: securityAnswer.toLowerCase(),
+  );
   print('✅ Registration successful!');
   saveData();
 }
@@ -548,18 +605,19 @@ bool login(){
 
 
 
-  if (users[email]!['password'] == password){
+  if (users[email]!.password == password){
     // ✅ SET THE CURRENT USER HERE!
-    currentUser = {
-      'email': email,
-      'name': users[email]!['name']!,
-      'role': users[email]!['role']!,
+        currentUser = User(
+      email: email,
+      password: password,
+      name: users[email]!.name,
+      role: users[email]!.role,
+      securityQuestion: users[email]!.securityQuestion,
+      securityAnswer: users[email]!.securityAnswer,
+    );
 
-
-    };
-
-    print('✅ Welcome back, ${currentUser!['name']}!');
-    print('  Role: ${currentUser!['role']}');
+    print('✅ Welcome back, ${currentUser!.name}!');
+    print('  Role: ${currentUser!.role}');
 
 
     return true;
@@ -592,7 +650,7 @@ void forgotPassword() {
   }
 
   // Show security question
-  print('\nSecurity Question: ${users[email]!['securityQuestion']}');
+  print('\nSecurity Question: ${users[email]!.securityQuestion}');
   print('Your answer: ');
   String? answer = stdin.readLineSync();
 
@@ -602,7 +660,7 @@ void forgotPassword() {
   }
 
   // Check answer (case-insensitive)
-  if (answer.toLowerCase() != users[email]!['securityAnswer']) {
+  if (answer.toLowerCase() != users[email]!.securityAnswer) {
     print('❌ Incorrect answer!');
     return;
   }
@@ -626,7 +684,7 @@ void forgotPassword() {
   }
 
   // Update password
-  users[email]!['password'] = newPassword;
+  users[email]!.password = newPassword;
   print('✅ Password reset successful!');
   saveData();
 }
@@ -644,9 +702,9 @@ void showUserMenu(){
   bool inMenu = true;
 
   do{
-    String role = currentUser!['role']!;
+    String role = currentUser!.role;
 
-    if(role == 'candidate'){
+    if(currentUser!.isCandidate){
       print('\n=== CANDIDATE MANU ===');
       print('1. Browse Jobs');
       print('2. My Applications');
@@ -655,14 +713,14 @@ void showUserMenu(){
       print('5. Notifications');
       print('6. Profile');
       print('7. Logout');
-    }else if (role == 'admin') {
+    }else if (currentUser!.isAdmin) {
       print('\n=== ADMIN MENU ===');
       print('1. Dashboard & Analytics');
       print('2. View All Users');
       print('3. View All Jobs');
       print('4. Manage Categories');
       print('5. Logout');
-    }else if (role == 'employer'){
+    }else if (currentUser!.isEmployer) {
       print('\n=== EMPLOYER MENU ===');
       print('1. Post a Job');
       print('2. View Applications');
@@ -721,7 +779,7 @@ void showUserMenu(){
         if (role == 'candidate') {
           viewNotifications();
         } else if (role == 'admin') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
         } else if (role == 'employer') {
@@ -739,11 +797,11 @@ void showUserMenu(){
 
       case '7':
         if (role == 'candidate') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
         } else if (role == 'employer') {
-          print('Logged out. Goodbye, ${currentUser!['name']}!');
+          print('Logged out. Goodbye, ${currentUser!.name}!');
           currentUser = null;
           inMenu = false;
         }
@@ -782,7 +840,7 @@ void browseJobs() {
   // Show available categories
   Set<String> categories = {};
   for (var job in jobs) {
-    if (job.postedBy != currentUser!['email']) {
+    if (job.postedBy != currentUser!.email) {
       categories.add(job.category);
     }
   }
@@ -804,7 +862,7 @@ void browseJobs() {
   // Show available locations
   Set<String> locations = {};
   for (var job in jobs) {
-    if (job.postedBy!= currentUser!['email']) {
+    if (job.postedBy!= currentUser!.email) {
       locations.add(job.location);
     }
   }
@@ -828,7 +886,7 @@ void browseJobs() {
 
   for (int i = 0; i < jobs.length; i++) {
     // Skip own jobs
-    if (jobs[i].postedBy == currentUser!['email']) {
+    if (jobs[i].postedBy == currentUser!.email) {
       continue;
     }
 
@@ -919,7 +977,7 @@ void browseJobs() {
     // Check if already bookmarked
     bool alreadyBookmarked = false;
     for (var bm in bookmarks) {
-      if (bm['candidateEmail'] == currentUser!['email'] &&
+      if (bm['candidateEmail'] == currentUser!.email &&
           bm['jobTitle'] == selectedJob.title &&
           bm['jobCompany'] == selectedJob.company) {
         alreadyBookmarked = true;
@@ -931,7 +989,7 @@ void browseJobs() {
       print('Already bookmarked!');
     } else {
       bookmarks.add({
-        'candidateEmail': currentUser!['email']!,
+        'candidateEmail': currentUser!.email,
         'jobTitle': selectedJob.title,
         'jobCompany': selectedJob.company,
         'location': selectedJob.location,
@@ -956,7 +1014,7 @@ void browseJobs() {
 
   // Check if already applied
   for (var app in applications) {
-    if (app.applicantEmail == currentUser!['email'] &&
+    if (app.applicantEmail == currentUser!.email &&
         app.jobTitle == selectedJob.title &&
         app.jobCompany == selectedJob.company) {
       print('You have already applied for this job!');
@@ -966,8 +1024,8 @@ void browseJobs() {
 
   // Apply
   applications.add(Application(
-    applicantEmail: currentUser!['email']!,
-    applicantName: currentUser!['name']!,
+    applicantEmail: currentUser!.email,
+    applicantName: currentUser!.name,
     jobTitle: selectedJob.title,
     jobCompany: selectedJob.company,
     status: 'Applied',
@@ -979,7 +1037,7 @@ void browseJobs() {
   //Notify employer
   addNotification(
     selectedJob.postedBy,
-    '${currentUser!['name']} applied for "${selectedJob.title}',
+    '${currentUser!.name} applied for "${selectedJob.title}',
     'application',
     );
 
@@ -996,7 +1054,7 @@ void myBookmarks() {
   bool found = false;
 
   for (int i = 0; i < bookmarks.length; i++) {
-    if (bookmarks[i]['candidateEmail'] == currentUser!['email']) {
+    if (bookmarks[i]['candidateEmail'] == currentUser!.email) {
       found = true;
       print('\n${i + 1}. ${bookmarks[i]['jobTitle']}');
       print('   Company: ${bookmarks[i]['jobCompany']}');
@@ -1045,7 +1103,7 @@ void myApplications() {
   bool found = false;
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i].applicantEmail == currentUser!['email']) {
+    if (applications[i].applicantEmail == currentUser!.email) {
       found = true;
       print('\n${i + 1}. ${applications[i].statusIcon} ${applications[i].jobTitle}');
       print('   Company: ${applications[i].jobCompany}');
@@ -1070,7 +1128,7 @@ void withdrawApplication() {
   List<int> myAppIndexes = [];
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i].applicantEmail == currentUser!['email']) {
+    if (applications[i].applicantEmail == currentUser!.email) {
       myAppIndexes.add(i);
       print('\n${myAppIndexes.length}. ${applications[i].jobTitle}');
       print('   Company: ${applications[i].jobCompany}');
@@ -1124,7 +1182,7 @@ void viewApplicants() {
   bool found = false;
 
   for (int i = 0; i < applications.length; i++) {
-    if (applications[i].employerEmail == currentUser!['email']) {
+    if (applications[i].employerEmail == currentUser!.email) {
       found = true;
       print('\n${i + 1}. ${applications[i].applicantName}');
       print('   Applied for: ${applications[i].jobTitle}');
@@ -1154,7 +1212,7 @@ void viewApplicants() {
   int actualIndex = appIndex - 1;
 
   // Check if this application belongs to this employer
-  if (applications[actualIndex].employerEmail != currentUser!['email']) {
+  if (applications[actualIndex].employerEmail != currentUser!.email) {
     print('Invalid choice!');
     return;
   }
@@ -1291,7 +1349,7 @@ void postJob() {
     location: location,
     salary: salary,
     category: category,
-    postedBy: currentUser!['email']!,
+    postedBy: currentUser!.email,
     deadline: deadline?.toIso8601String() ?? 'No deadline',
     status: 'Open',
   ));
@@ -1352,7 +1410,7 @@ void myPostedJobs() {
   List<int> myJobIndexes = [];
 
   for (int i = 0; i < jobs.length; i++) {
-    if (jobs[i].postedBy == currentUser!['email']) {
+    if (jobs[i].postedBy == currentUser!.email) {
       myJobIndexes.add(i);
             print('\n${myJobIndexes.length}. ${jobs[i].title}');
       print('   Company: ${jobs[i].company}');
@@ -1508,7 +1566,7 @@ void closeJob(List<int> myJobIndexes) {
 
 // ---------- COMPANY PROFILE (Employer) ----------
 void companyProfile() {
-  String email = currentUser!['email']!;
+  String email = currentUser!.email;
 
   print('\n=== COMPANY PROFILE ===');
 
@@ -1597,9 +1655,9 @@ void adminDashboard() {
   int employerCount = 0;
 
   for (var user in users.values) {
-    if (user['role'] == 'candidate') {
+    if (user.role == 'candidate') {
       candidateCount++;
-    } else if (user['role'] == 'employer') {
+    } else if (user.role == 'employer') {
       employerCount++;
     }
   }
@@ -1667,10 +1725,10 @@ void viewAllUsers() {
   print('\n=== ALL REGISTERED USERS ===');
 
   int count = 1;
-  users.forEach((email, data) {
-    print('\n$count. ${data['name']}');
+  users.forEach((email, user) {
+    print('\n$count. ${user.name}');
     print('   Email: $email');
-    print('   Role: ${data['role']}');
+    print('   Role: ${user.role}');
     count++;
   });
 
@@ -1807,14 +1865,14 @@ void editProfile() {
   print('\n=== EDIT PROFILE ===');
   print('Leave field blank to keep current value.\n');
 
-  String email = currentUser!['email']!;
+  String email = currentUser!.email;
 
   // Edit name
-  print('New Name [${currentUser!['name']}]: ');
+  print('New Name [${currentUser!.name}]: ');
   String? newName = stdin.readLineSync();
   if (newName != null && newName.isNotEmpty) {
-    users[email]!['name'] = newName;
-    currentUser!['name'] = newName;
+    users[email]!.name = newName;
+    currentUser!.name = newName;
   }
 
   // Edit password
@@ -1824,7 +1882,7 @@ void editProfile() {
     print('Confirm new password: ');
     String? confirm = stdin.readLineSync();
     if (newPassword == confirm) {
-      users[email]!['password'] = newPassword;
+      users[email]!.password = newPassword;
       print('✅ Password updated!');
     } else {
       print('❌ Passwords do not match!');
@@ -1854,7 +1912,7 @@ void addNotification(String email, String message, String type) {
 
 // ---------- VIEW NOTIFICATIONS ----------
 void viewNotifications() {
-  String email = currentUser!['email']!;
+  String email = currentUser!.email;
   
   print('\n=== NOTIFICATIONS ===');
   
